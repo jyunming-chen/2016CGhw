@@ -192,12 +192,12 @@ function init() {
 function makeHead(){
 	THREE.ImageUtils.crossOrigin = '';
 	var materials = [];
-  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('images/hw2/head2.JPG'), side:THREE.DoubleSide}));
-  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('images/hw2/head4.JPG'), side:THREE.DoubleSide}));
-  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('images/hw2/head3.JPG'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/head2.JPG'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/head4.JPG'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/head3.JPG'), side:THREE.DoubleSide}));
   materials.push(new THREE.MeshLambertMaterial({visible:false}));
-  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('images/hw2/head1.JPG'), side:THREE.DoubleSide}));
-  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('images/hw2/head5.JPG'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/head1.JPG'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/head5.JPG'), side:THREE.DoubleSide}));
   
   var box = new THREE.Mesh(new THREE.BoxGeometry(headX, headY, headZ), new THREE.MeshFaceMaterial(materials));
   var ball = makeLinkBall(headBallRadius);
@@ -216,8 +216,8 @@ function makeTorso(){
   materials.push(new THREE.MeshLambertMaterial({color:boxColor, side:THREE.DoubleSide}));
   materials.push(new THREE.MeshLambertMaterial({color:boxColor, side:THREE.DoubleSide}));
   materials.push(new THREE.MeshLambertMaterial({visible:false}));
-  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('images/hw2/body1.JPG'), side:THREE.DoubleSide}));
-  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('images/hw2/body2.JPG'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/body1.JPG'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/body2.JPG'), side:THREE.DoubleSide}));
   
   var box = new THREE.Mesh(new THREE.BoxGeometry(torsoX, torsoY, torsoZ), new THREE.MeshFaceMaterial(materials));
   

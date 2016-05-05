@@ -39,8 +39,8 @@ body {
   <p id='thetaPrint'></p>
 </div>
 <div id="birdImg">
-  <img id="bird" src="images/hw3/bird_eye.png" style="cursor:pointer">
-  <img id="carChange" src="images/hw3/car_transparent.png" height="50" width="100" style="cursor:pointer">
+  <img id="bird" src="https://mdes4214.github.io/2016CGhw/images/hw3/bird_eye.png" style="cursor:pointer">
+  <img id="carChange" src="https://mdes4214.github.io/2016CGhw/images/hw3/car_transparent.png" height="50" width="100" style="cursor:pointer">
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r70/three.min.js"></script>
@@ -127,14 +127,14 @@ function init() {
   sceneHUD.add(fright);  
   
   THREE.ImageUtils.crossOrigin = '';
-  var pTexture = THREE.ImageUtils.loadTexture("images/hw3/road.jpg");
+  var pTexture = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw3/road.jpg");
   var plane = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshLambertMaterial({
   	map:pTexture,
     side:THREE.DoubleSide}));
   plane.rotation.x = -Math.PI/2;
   scene.add(plane);
   
-  var ppTexture = THREE.ImageUtils.loadTexture("images/hw3/parking_space.JPG");
+  var ppTexture = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw3/parking_space.JPG");
   var parkingPlace = new THREE.Mesh(new THREE.PlaneGeometry(50, 30), new THREE.MeshLambertMaterial({
   	map:ppTexture,
     side:THREE.DoubleSide,
@@ -170,8 +170,8 @@ function init() {
   car.add (mesh);
   mesh.position.y = 10;
   
-  var carUpTexture1 = THREE.ImageUtils.loadTexture("images/hw3/glass1.png");
-  var carUpTexture2 = THREE.ImageUtils.loadTexture("images/hw3/glass2.png");
+  var carUpTexture1 = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw3/glass1.png");
+  var carUpTexture2 = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw3/glass2.png");
   var carUpMaterials = [];
   carUpMaterials.push(new THREE.MeshLambertMaterial({map: carUpTexture1}));
   carUpMaterials.push(new THREE.MeshLambertMaterial({map: carUpTexture1}));
@@ -186,7 +186,7 @@ function init() {
   
   var wheelG = new THREE.CylinderGeometry(wheelRadius, wheelRadius, carWidth/20, 20);
   var wheelM = new THREE.MeshLambertMaterial({
-    map: THREE.ImageUtils.loadTexture("images/hw3/parking_space.JPG"),
+    map: THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw3/parking_space.JPG"),
     side: THREE.DoubleSide
   });
   frontWheel = new THREE.Mesh(wheelG, wheelM);
@@ -220,7 +220,7 @@ function init() {
 function makeBar(){
 	var barM = new THREE.MeshLambertMaterial({
   	color: 0x8888FF,
-    map: THREE.ImageUtils.loadTexture("images/hw3/tire.JPG")
+    map: THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw3/tire.JPG")
   });
 	
   barRadius[0] = 10;
