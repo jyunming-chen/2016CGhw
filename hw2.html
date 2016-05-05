@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+#gui {
+  position: absolute;
+  top: 80px;
+  right: 1%;
+  height: 600px;
+  //text-align: center;
+}
+
+body {
+  overflow: hidden;
+}
+
+
+</style>
+</head>
+
+<body> 
+<div id="info">Computer Graphics
+  <br>Homework 2
+  <br>Polygonal model construc
+  tion: kinematics and texturing
+</div>
+<div id='gui'></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r74/three.min.js"></script>
+<script src="https://dl.dropboxusercontent.com/u/3587259/Code/Threejs/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5.1/dat.gui.min.js"></script>
+
+<script>
+var camera, scene, renderer;
+var controls; 
+var boxColor = 0xC0A47C;
+var headX = 29.5, headY = 19, headZ = 20.6, headBallRadius = 5;
+var torsoX = 14.8, torsoY = 23.6, torsoZ = 14.8;
+var handX = 5, handY = 19, handZ = 5, ballRadius = 2.5;
+var legX = 6.8, legY = 18, legZ = 14.8;
+var head, torso, handR, handL, legR, legL, lidFrame, lidFrame2, lidFrame3, lidFrame4, body, danboard;
+var gcontrols;
+
+
+init();
+animate();
+
+function init() {
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 10000);
+  camera.position.z = 300;
+  camera.position.y = 100;
+  camera.position.x = 30;
+  scene.add(camera);
+
+  var gridXZ = new THREE.GridHelper(100, 10);
+  gridXZ.setColors(new THREE.Color(0xff00ff), new THREE.Color(0xffffff));
+  scene.add(gridXZ);
+
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  var light = new THREE.PointLight(0xffffff, 1);
+  light.position.set(150, 150, 150);
+  scene.add(light);
+  var amblight = new THREE.AmbientLight(0x404040); // soft white light
+  scene.add(amblight);
+  document.body.appendChild(renderer.domElement);
+  window.addEventListener('resize', onWindowResize, false);
+  ///////////////////////////////////////////////////////////////
+  // Danboard
+  head = makeHead();
+  torso = makeTorso();
+  handR = makeHand();
+  handL = handR.clone();
+  legR = makeLeg();
+  legL = legR.clone();
+  
+  body = new THREE.Object3D();
+  body.add(head);
+  body.add(torso);
+  body.add(handR);
+  body.add(handL);
+  
+  head.position.y = torsoY + ballRadius;
+  torso.position.y = torsoY/2 + ballRadius;
+  handR.position.y = torsoY;
+  handR.position.x = -(torsoX/2 + ballRadius);
+  handL.position.y = torsoY;
+  handL.position.x = torsoX/2 + ballRadius;
+  
+  danboard = new THREE.Object3D();
+  danboard.add(body);
+  danboard.add(legR);
+  danboard.add(legL);
+  
+  body.position.y = legY;
+  legR.position.y = ballRadius + legY;
+  legR.position.x = -(torsoX/2 - legX/2);
+  legL.position.y = ballRadius + legY;
+  legL.position.x = torsoX/2 - legX/2;
+  scene.add(danboard);
+  
+  // gui
+  gcontrols = new function() {
+    this.Head_rX = 0;
+    this.Head_rY = 0;
+    this.Head_rZ = 0;
+    this.R_Hand_rX = 0;
+    this.R_Hand_rY = 0;
+    this.R_Hand_rZ = -0.1;
+    this.L_Hand_rX = 0;
+    this.L_Hand_rY = 0;
+    this.L_Hand_rZ = 0.1;
+    this.R_Leg_rX = 0;
+    this.R_Leg_rY = 0;
+    this.R_Leg_rZ = 0;
+    this.L_Leg_rX = 0;
+    this.L_Leg_rY = 0;
+    this.L_Leg_rZ = 0;
+    this.Skirt1 = -Math.PI/4;
+    this.Skirt2 = -Math.PI/4;
+    this.Skirt3 = Math.PI/4;
+    this.Skirt4 = Math.PI/4;
+    this.Body_rX = 0;
+    this.Body_rY = 0;
+    this.Body_rZ = 0;
+    this.Danboard_rX = 0;
+    this.Danboard_rY= 0;
+    this.Danboard_rZ= 0;
+    this.Position_X = 0;
+    this.Position_Y = 0;
+    this.Position_Z = 0;
+  }
+
+  var gui = new dat.GUI({load:loadJSON(), preset:'Default', autoPlace:false});
+  gui.remember(gcontrols);
+  
+  var guiContainer = document.getElementById('gui');
+	guiContainer.appendChild(gui.domElement);
+  
+  var f1 = gui.addFolder("Head Rotation");
+  f1.add(gcontrols, 'Head_rX', -Math.PI/6, Math.PI/6);
+  f1.add(gcontrols, 'Head_rY', -Math.PI/3, Math.PI/3);
+  f1.add(gcontrols, 'Head_rZ', -Math.PI/7, Math.PI/7);
+  var f2 = gui.addFolder('Hand Rotation');
+  f2.add(gcontrols, 'R_Hand_rX', -Math.PI, Math.PI);
+  f2.add(gcontrols, 'R_Hand_rY', -Math.PI/4, Math.PI/4);
+  f2.add(gcontrols, 'R_Hand_rZ', -Math.PI, -0.1);
+  f2.add(gcontrols, 'L_Hand_rX', -Math.PI, Math.PI);
+  f2.add(gcontrols, 'L_Hand_rY', -Math.PI/4, Math.PI/4);
+  f2.add(gcontrols, 'L_Hand_rZ', 0.1, Math.PI);
+  var f3 = gui.addFolder('Leg Rotation');
+  f3.add(gcontrols, 'R_Leg_rX', -Math.PI/2, Math.PI/2);
+  f3.add(gcontrols, 'R_Leg_rY', -Math.PI/9, Math.PI/9);
+  f3.add(gcontrols, 'R_Leg_rZ', -Math.PI/2 + 0.2, Math.PI/2 - 0.5);
+  f3.add(gcontrols, 'L_Leg_rX', -Math.PI/2, Math.PI/2);
+  f3.add(gcontrols, 'L_Leg_rY', -Math.PI/9, Math.PI/9);
+  f3.add(gcontrols, 'L_Leg_rZ', -Math.PI/2 + 0.5, Math.PI/2 - 0.2);
+  var f4 = gui.addFolder('Skirt Rotation');
+  f4.add(gcontrols, 'Skirt1', -Math.PI/2, -0.1);
+  f4.add(gcontrols, 'Skirt2', -Math.PI/2, -0.1);
+  f4.add(gcontrols, 'Skirt3', 0.1, Math.PI/2);
+  f4.add(gcontrols, 'Skirt4', 0.1, Math.PI/2);
+  var f5 = gui.addFolder('Body Rotation');
+  f5.add(gcontrols, 'Body_rX', -Math.PI/9, Math.PI/9);
+  f5.add(gcontrols, 'Body_rY', -Math.PI/9, Math.PI/9);
+  f5.add(gcontrols, 'Body_rZ', -Math.PI/9, Math.PI/9);
+  var f6 = gui.addFolder('Danboard Rotation');
+  f6.add(gcontrols, 'Danboard_rX', -Math.PI/2, Math.PI/2);
+  f6.add(gcontrols, 'Danboard_rY', -Math.PI, Math.PI);
+  f6.add(gcontrols, 'Danboard_rZ', -Math.PI/2, Math.PI/2);
+  var f7 = gui.addFolder('Move');
+  f7.add(gcontrols, 'Position_X', -90, 90);
+  f7.add(gcontrols, 'Position_Y', -30, 30);
+  f7.add(gcontrols, 'Position_Z', -90, 90);
+}
+
+function makeHead(){
+	THREE.ImageUtils.crossOrigin = '';
+	var materials = [];
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('/images/hw2/head2.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('/images/hw2/head4.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('/images/hw2/head3.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({visible:false}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('/images/hw2/head1.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('/images/hw2/head5.jpg'), side:THREE.DoubleSide}));
+  
+  var box = new THREE.Mesh(new THREE.BoxGeometry(headX, headY, headZ), new THREE.MeshFaceMaterial(materials));
+  var ball = makeLinkBall(headBallRadius);
+  
+  var headFrame = new THREE.Object3D();
+  headFrame.add(box);
+  headFrame.add(ball);
+  box.position.y = headY/2 - headBallRadius/2;
+  
+  return headFrame;
+}
+
+function makeTorso(){
+  var materials = [];
+  materials.push(new THREE.MeshLambertMaterial({color:boxColor, side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({color:boxColor, side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({color:boxColor, side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({visible:false}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('/images/hw2/body1.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('/images/hw2/body2.jpg'), side:THREE.DoubleSide}));
+  
+  var box = new THREE.Mesh(new THREE.BoxGeometry(torsoX, torsoY, torsoZ), new THREE.MeshFaceMaterial(materials));
+  
+  var lid;
+  
+  lid = new THREE.Mesh(new THREE.PlaneGeometry(torsoX, torsoZ/2), new THREE.MeshLambertMaterial({color:boxColor, side:THREE.DoubleSide}));
+  lid2 = lid.clone();
+  lid3 = lid.clone();
+  lid4 = lid.clone();
+  lid.position.y = -torsoZ/4;
+  lidFrame = new THREE.Object3D();
+  lidFrame.add(lid);
+  lidFrame2 = lidFrame.clone();
+  lidFrame3 = lidFrame.clone();
+  lidFrame4 = lidFrame.clone();
+  
+  lidFrame.position.z = torsoZ/2;
+  lidFrame.position.y = -torsoY/2;
+  lidFrame.rotation.x = -Math.PI/4;
+  
+  lidFrame2.position.x = torsoZ/2;
+  lidFrame2.position.y = -torsoY/2;
+  lidFrame2.rotation.set(-Math.PI/4, Math.PI/2, 0, 'YXZ');
+  
+  lidFrame3.position.z = -torsoZ/2;
+  lidFrame3.position.y = -torsoY/2;
+  lidFrame3.rotation.x = Math.PI/4;
+  
+  lidFrame4.position.x = -torsoZ/2;
+  lidFrame4.position.y = -torsoY/2;
+  lidFrame4.rotation.set(Math.PI/4, Math.PI/2, 0, 'YXZ');
+  
+  var torsoFrame = new THREE.Object3D();  
+  torsoFrame.add(box);
+  torsoFrame.add(lidFrame);
+  torsoFrame.add(lidFrame2);
+  torsoFrame.add(lidFrame3);
+  torsoFrame.add(lidFrame4);
+  
+  return torsoFrame;
+}
+
+function makeHand(){
+  var box = new THREE.Mesh(new THREE.BoxGeometry(handX, handY, handZ), new THREE.MeshLambertMaterial({color:boxColor, side:THREE.DoubleSide}));
+  var ball = makeLinkBall(ballRadius);
+  
+  var handFrame = new THREE.Object3D();
+  handFrame.add(ball);
+  handFrame.add(box);
+  box.position.y = -handY/2 - ballRadius;
+  
+  return handFrame;
+}
+
+function makeLeg(){
+  var box = new THREE.Mesh(new THREE.BoxGeometry(legX, legY, legZ), new THREE.MeshLambertMaterial({color:boxColor, side:THREE.DoubleSide}));
+  var ball = makeLinkBall(ballRadius);
+  
+  var legFrame = new THREE.Object3D();
+  legFrame.add(ball);
+  legFrame.add(box);
+  box.position.y = -legY/2 - ballRadius;
+
+	return legFrame;
+}
+
+function makeLinkBall(radius){
+	return new THREE.Mesh(new THREE.SphereGeometry(radius, 20, 20), new THREE.MeshLambertMaterial({color:boxColor, side:THREE.DoubleSide}));
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+
+function animate() {
+  controls.update();
+  
+  head.rotation.x = gcontrols.Head_rX;
+  head.rotation.y = gcontrols.Head_rY;
+  head.rotation.z = gcontrols.Head_rZ;
+  handR.rotation.x = gcontrols.R_Hand_rX;
+  handR.rotation.y = gcontrols.R_Hand_rY;
+  handR.rotation.z = gcontrols.R_Hand_rZ;
+  handL.rotation.x = gcontrols.L_Hand_rX;
+  handL.rotation.y = gcontrols.L_Hand_rY;
+  handL.rotation.z = gcontrols.L_Hand_rZ;
+  legR.rotation.x = gcontrols.R_Leg_rX;
+  legR.rotation.y = gcontrols.R_Leg_rY;
+  legR.rotation.z = gcontrols.R_Leg_rZ;
+  legL.rotation.x = gcontrols.L_Leg_rX;
+  legL.rotation.y = gcontrols.L_Leg_rY;
+  legL.rotation.z = gcontrols.L_Leg_rZ;
+  lidFrame.rotation.x = gcontrols.Skirt1;
+  lidFrame2.rotation.x = gcontrols.Skirt2;
+  lidFrame3.rotation.x = gcontrols.Skirt3;
+  lidFrame4.rotation.x = gcontrols.Skirt4;
+  body.rotation.x = gcontrols.Body_rX;
+  body.rotation.y = gcontrols.Body_rY;
+  body.rotation.z = gcontrols.Body_rZ;
+  danboard.rotation.x = gcontrols.Danboard_rX;
+  danboard.rotation.y = gcontrols.Danboard_rY;
+  danboard.rotation.z = gcontrols.Danboard_rZ;
+  danboard.position.x = gcontrols.Position_X;
+  danboard.position.y = gcontrols.Position_Y;
+  danboard.position.z = gcontrols.Position_Z;
+  
+  
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+
+function loadJSON(){
+	return{
+    "preset": "Default",
+    "closed": false,
+    "remembered": {
+      "Default": {
+        "0": {
+          "Head_rX": 0,
+          "Head_rY": 0,
+          "Head_rZ": 0,
+          "R_Hand_rX": 0,
+          "R_Hand_rY": 0,
+          "R_Hand_rZ": -0.1,
+          "L_Hand_rX": 0,
+          "L_Hand_rY": 0,
+          "L_Hand_rZ": 0.1,
+          "R_Leg_rX": 0,
+          "R_Leg_rY": 0,
+          "R_Leg_rZ": 0,
+          "L_Leg_rX": 0,
+          "L_Leg_rY": 0,
+          "L_Leg_rZ": 0,
+          "Skirt1": -0.7853981633974483,
+          "Skirt2": -0.7853981633974483,
+          "Skirt3": 0.7853981633974483,
+          "Skirt4": 0.7853981633974483,
+          "Body_rX": 0,
+          "Body_rY": 0,
+          "Body_rZ": 0,
+          "Danboard_rX": 0,
+          "Danboard_rY": 0,
+          "Danboard_rZ": 0,
+          "Position_X": 0,
+          "Position_Y": 0,
+          "Position_Z": 0
+        }
+      },
+      "Pose 1": {
+        "0": {
+          "Head_rX": -0.027674353889973524,
+          "Head_rY": 0,
+          "Head_rZ": -0.19577628637592692,
+          "R_Hand_rX": 0,
+          "R_Hand_rY": 0.01162322863378884,
+          "R_Hand_rZ": -2.0784284843293723,
+          "L_Hand_rX": 0,
+          "L_Hand_rY": -0.023799944345377244,
+          "L_Hand_rZ": 1.0602773141707027,
+          "R_Leg_rX": 0,
+          "R_Leg_rY": 0,
+          "R_Leg_rZ": 0,
+          "L_Leg_rX": 0.02324645726757768,
+          "L_Leg_rY": -0.010577753042389892,
+          "L_Leg_rZ": 0.9939754732810382,
+          "Skirt1": -0.7853981633974483,
+          "Skirt2": -1.1893635937008007,
+          "Skirt3": 0.7965293386935661,
+          "Skirt4": 0.48143273309409573,
+          "Body_rX": 0,
+          "Body_rY": 0,
+          "Body_rZ": 0.34365397674927106,
+          "Danboard_rX": 0,
+          "Danboard_rY": 0,
+          "Danboard_rZ": 0.15910362936995187,
+          "Position_X": 0,
+          "Position_Y": 0.9925897659583615,
+          "Position_Z": 0
+        }
+      },
+      "Pose 2": {
+        "0": {
+          "Head_rX": -0.31571126114741876,
+          "Head_rY": 0,
+          "Head_rZ": 0,
+          "R_Hand_rX": 0,
+          "R_Hand_rY": 0.5658706805332718,
+          "R_Hand_rZ": -1.9675161990802628,
+          "L_Hand_rX": 0,
+          "L_Hand_rY": -0.5601866894089949,
+          "L_Hand_rZ": 1.9449772856578338,
+          "R_Leg_rX": 0.2003623221634081,
+          "R_Leg_rY": -0.04206501791275974,
+          "R_Leg_rZ": -0.6706741390682185,
+          "L_Leg_rX": -0.08302306166992057,
+          "L_Leg_rY": 0,
+          "L_Leg_rZ": 0.7462028572719261,
+          "Skirt1": -1.4085855065964783,
+          "Skirt2": -1.4248065886163201,
+          "Skirt3": 1.3328022335079786,
+          "Skirt4": 1.4139076436071876,
+          "Body_rX": -0.3490658503988659,
+          "Body_rY": 0,
+          "Body_rZ": 0,
+          "Danboard_rX": 0.5466067262601493,
+          "Danboard_rY": -0.023279936826592795,
+          "Danboard_rZ": 0.015338633774566901,
+          "Position_X": 0,
+          "Position_Y": 18.859205553208866,
+          "Position_Z": 39.036669574586995
+        }
+      },
+      "Pose 3": {
+        "0": {
+          "Head_rX": -0.5235987755982988,
+          "Head_rY": -0.14635165524278437,
+          "Head_rZ": 0,
+          "R_Hand_rX": -1.937204772298146,
+          "R_Hand_rY": 0,
+          "R_Hand_rZ": -0.1,
+          "L_Hand_rX": 0.7549563741184775,
+          "L_Hand_rY": 0,
+          "L_Hand_rZ": 0.1,
+          "R_Leg_rX": -0.15386940762825274,
+          "R_Leg_rY": 0.0838840415687197,
+          "R_Leg_rZ": -0.1594635374170148,
+          "L_Leg_rX": 0.3066318411009066,
+          "L_Leg_rY": 0.028781328045572485,
+          "L_Leg_rZ": 0.16806675325066434,
+          "Skirt1": -0.957187147469612,
+          "Skirt2": -0.6089224781228288,
+          "Skirt3": 0.6970251474516281,
+          "Skirt4": 0.5477688605887211,
+          "Body_rX": 0,
+          "Body_rY": 0,
+          "Body_rZ": 0,
+          "Danboard_rX": 0.31562059909250473,
+          "Danboard_rY": 0.1846075776242877,
+          "Danboard_rZ": 0,
+          "Position_X": 0,
+          "Position_Y": 22.167838106403405,
+          "Position_Z": 90
+        }
+      },
+      "Pose 4": {
+        "0": {
+          "Head_rX": -0.27563656474413617,
+          "Head_rY": 0.06272853548393997,
+          "Head_rZ": -0.14517175354854678,
+          "R_Hand_rX": -1.6538193884648171,
+          "R_Hand_rY": 0.5429708233212804,
+          "R_Hand_rZ": -0.8094906048895152,
+          "L_Hand_rX": 0.4007246443268162,
+          "L_Hand_rY": 0.047046401612955036,
+          "L_Hand_rZ": 0.3400693285426757,
+          "R_Leg_rX": -1.5707963267948966,
+          "R_Leg_rY": -0.0564834226531829,
+          "R_Leg_rZ": -0.13211861004769698,
+          "L_Leg_rX": -1.5707963267948966,
+          "L_Leg_rY": 0.08210825364740382,
+          "L_Leg_rZ": 0.24866471930538125,
+          "Skirt1": -1.5707963267948966,
+          "Skirt2": -1.1230274662061754,
+          "Skirt3": 0.5477688605887211,
+          "Skirt4": 1.128209976166693,
+          "Body_rX": -0.17588589361183166,
+          "Body_rY": 0.31216671187890116,
+          "Body_rZ": 0,
+          "Danboard_rX": 0,
+          "Danboard_rY": -0.4390549657283529,
+          "Danboard_rZ": 0,
+          "Position_X": -28.459434510581595,
+          "Position_Y": -12.7,
+          "Position_Z": -30.444614042498316
+        }
+      },
+      "Pose 5": {
+        "0": {
+          "Head_rX": -0.14247166577168546,
+          "Head_rY": -0.07705581709249099,
+          "Head_rZ": 0.11546716013956104,
+          "R_Hand_rX": -1.0870486207981593,
+          "R_Hand_rY": -0.09464629030370941,
+          "R_Hand_rZ": -1.6325854456072602,
+          "L_Hand_rX": 0.4007246443268162,
+          "L_Hand_rY": 0.029334815123371882,
+          "L_Hand_rZ": 1.334642261076618,
+          "R_Leg_rX": -0.18929258060741883,
+          "R_Leg_rY": -0.08929591521831454,
+          "R_Leg_rZ": -0.2145241187523732,
+          "L_Leg_rX": -0.18929258060741883,
+          "L_Leg_rY": 0.1783458361798293,
+          "L_Leg_rZ": 0.22312733458602274,
+          "Skirt1": -0.6786368157035964,
+          "Skirt2": -0.7435211437829636,
+          "Skirt3": 0.1,
+          "Skirt4": 0.8786119369524075,
+          "Body_rX": -0.048783885080928124,
+          "Body_rY": 0,
+          "Body_rZ": 0,
+          "Danboard_rX": -1.3975567314191633,
+          "Danboard_rY": 0,
+          "Danboard_rZ": 0,
+          "Position_X": -30.444614042498316,
+          "Position_Y": 3.748052042584291,
+          "Position_Z": 68.81436255333782
+        }
+    	}
+    },
+    "folders": {
+      "Head Rotation": {
+        "preset": "Default",
+        "closed": true,
+        "folders": {}
+      },
+      "Hand Rotation": {
+        "preset": "Default",
+        "closed": true,
+        "folders": {}
+      },
+      "Leg Rotation": {
+        "preset": "Default",
+        "closed": true,
+        "folders": {}
+      },
+      "Skirt Rotation": {
+        "preset": "Default",
+        "closed": true,
+        "folders": {}
+      },
+      "Body Rotation": {
+        "preset": "Default",
+        "closed": true,
+        "folders": {}
+      },
+      "Danboard Rotation": {
+        "preset": "Default",
+        "closed": true,
+        "folders": {}
+      },
+      "Move": {
+        "preset": "Default",
+        "closed": true,
+        "folders": {}
+      }
+    }  
+  }
+}
+</script>
+
+
+</body>
+
+</html>
