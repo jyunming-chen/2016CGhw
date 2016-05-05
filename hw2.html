@@ -192,7 +192,7 @@ function init() {
 function makeHead(){
 	THREE.ImageUtils.crossOrigin = '';
 	var materials = [];
-  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('/images/hw2/head2.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('images/hw2/head2.jpg'), side:THREE.DoubleSide}));
   materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('/images/hw2/head4.jpg'), side:THREE.DoubleSide}));
   materials.push(new THREE.MeshLambertMaterial({map:THREE.ImageUtils.loadTexture('/images/hw2/head3.jpg'), side:THREE.DoubleSide}));
   materials.push(new THREE.MeshLambertMaterial({visible:false}));
