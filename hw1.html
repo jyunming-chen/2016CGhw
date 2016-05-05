@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 10%;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #000000
+}
+
+#bot {
+  position: absolute;
+  bottom: 5%;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #000000
+}
+
+#modeDisplay {
+  position: absolute;
+  bottom: 15%;
+  text-align: center;
+  width: 100%;
+  padding: 0px;
+  color: #000000
+}
+
+#speedDisplay {
+  position: absolute;
+  bottom: 10%;
+  text-align: center;
+  width: 100%;
+  padding: 10px;
+  color: #000000
+}
+
+body {
+  overflow: hidden;
+}
+</style>
+</head>
+<body> 
+<div id="info">
+  Computer Graphics<br/>
+  Homework 1<br/>
+  time-based animation
+</div>
+<div id="modeDisplay">Analog-Mechanical</div>
+<div id="speedDisplay">Now speed: 1x</div>
+<div id="bot">
+  <button id="toggle" style="width:15%">Start</button>
+  <button id="mode" style="width:20%">Change Mode</button>
+  <button id="speed" style="width:20%">Speed Up</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r70/three.min.js"></script>
+<script src="https://dl.dropboxusercontent.com/u/3587259/Code/Threejs/OrbitControls.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+
+<script>
+var scene, renderer, camera;
+var controls;
+var handFrame, handFrame2, handFrame3, sector, sectorMesh, sectorMaterial, sectorLid, sectorLid2Frame, angle = 0, angle2 = 0, angle3 = 0, turn = false, speedUp = 1, speedMax1 = 256, speedMax2 = 16;
+var clock, start;
+var mode = 0, modeText = ["Analog-Mechanical", "Analog-Quartz", "Sector"]
+
+init();
+animate();
+
+$("#toggle").click(function() {
+  turn = !turn;
+  start = clock.getElapsedTime();
+  
+  if(turn)
+  	document.getElementById("toggle").innerHTML = "Pause";
+  else
+  	document.getElementById("toggle").innerHTML = "Restart";
+    
+  if(mode == 2 && !sectorLid.visible){
+  	sectorLid.visible = true;
+    sectorLid2Frame.visible = true;
+  }
+});
+
+$("#mode").click(function(){
+	mode++;
+  if(mode > 2)
+  	mode = 0;
+	document.getElementById("modeDisplay").innerHTML = modeText[mode];
+  
+  if(mode == 2){
+  	handFrame.visible = false;
+    handFrame2.visible = false;
+    handFrame3.visible = false;
+    if(turn || angle != 0){
+      sectorLid.visible = true;
+      sectorLid2Frame.visible = true;
+    }
+  }
+  else{
+  	handFrame.visible = true;
+    handFrame2.visible = true;
+    handFrame3.visible = true;
+    sectorLid.visible = false;
+    sectorLid2Frame.visible = false;
+    scene.remove(sectorMesh);
+  }
+        
+  if(mode == 1 && speedUp >= speedMax2){
+    speedUp = speedMax2;
+    document.getElementById("speedDisplay").innerHTML = "Now speed: " + speedUp + "x";
+    document.getElementById("speed").innerHTML = "Speed Default";
+  }
+  else{
+  	if(speedUp < speedMax1)
+    	document.getElementById("speed").innerHTML = "Speed Up";
+    else
+      document.getElementById("speed").innerHTML = "Speed Default";
+  }
+});
+
+$("#speed").click(function(){
+	speedUp *= 2;
+  var limit = (mode == 1)? speedMax2 : speedMax1;
+  if(speedUp > limit)
+  	speedUp = 1;
+	
+  document.getElementById("speedDisplay").innerHTML = "Now speed: " + speedUp + "x";
+	if(speedUp < limit)
+  	document.getElementById("speed").innerHTML = "Speed Up";
+  else
+  	document.getElementById("speed").innerHTML = "Speed Default";
+});
+
+function init() {
+	clock = new THREE.Clock(true);
+
+  scene = new THREE.Scene();
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0xFEF9F3);
+  document.body.appendChild(renderer.domElement);
+
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 10000);
+  camera.position.z = 550;
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+	// light
+	var light = new THREE.PointLight(0xDDDDDD, 5);
+  light.position.set(150, 500, 150);
+  scene.add(light);
+
+  // board
+  var board = new THREE.Mesh(new THREE.CylinderGeometry(120, 120, 5, 50), 
+  	new THREE.MeshLambertMaterial({
+  		color: 0xFFDDDD
+  	}));
+ 
+  // ring
+  var ringMaterial = new THREE.MeshLambertMaterial({
+  	color: 0x220000,
+    side: THREE.DoubleSide
+  });
+  var inner = new THREE.Mesh(new THREE.CylinderGeometry(120, 120, 16, 50, 1, true), ringMaterial);
+  var outer = new THREE.Mesh(new THREE.CylinderGeometry(140, 140, 16, 50, 1, true), ringMaterial);
+  var topR = new THREE.Mesh(new THREE.RingGeometry(120, 140, 50), ringMaterial);
+  var botC = new THREE.Mesh(new THREE.CircleGeometry(140, 50), ringMaterial);
+  var mark = new THREE.Mesh(new THREE.CylinderGeometry(18, 18, 10, 50), ringMaterial);
+  var mark2 = new THREE.Mesh(new THREE.CylinderGeometry(13, 13, 10, 50), ringMaterial);
+  var mark3 = mark2.clone();
+  var mark4 = mark2.clone();
+  inner.position.setY(5);
+  outer.position.setY(5);
+  topR.position.setY(13.5);
+  topR.rotation.x = Math.PI / 2;
+  botC.position.setY(-2.55);
+  botC.rotation.x = Math.PI / 2;
+  mark.position.set(0, 5, -120);
+  mark2.position.set(0, 5, 125);
+  mark3.position.set(125, 5, 0);
+  mark4.position.set(-125, 5, 0);
+  
+  var boardFrame = new THREE.Object3D();
+  boardFrame.add(board);
+  boardFrame.add(inner);
+  boardFrame.add(outer);
+  boardFrame.add(topR);
+  boardFrame.add(botC);
+  boardFrame.add(mark);
+  boardFrame.add(mark2);
+  boardFrame.add(mark3);
+  boardFrame.add(mark4);
+  boardFrame.add(center);
+  boardFrame.rotation.x = Math.PI / 2;
+  scene.add(boardFrame);
+  
+  // analog - second
+  var handMaterial = new THREE.MeshLambertMaterial({
+    color: 0x220000
+  });
+  var hand = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 80, 50), handMaterial);
+  hand.rotation.x = -Math.PI / 2;
+  hand.position.set(0, 7.5, -40);
+  var head = new THREE.Mesh(new THREE.CylinderGeometry(0, 3, 10, 50), handMaterial);
+  head.rotation.x = -Math.PI / 2;
+  head.position.set(0, 7.5, -85);
+  var center = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 10, 50), ringMaterial);
+  center.position.setY(8);
+  
+  handFrame = new THREE.Object3D();
+  handFrame.add(hand);
+  handFrame.add(head);
+  handFrame.add(center);
+  handFrame.rotation.x = Math.PI / 2;
+  scene.add(handFrame);
+  
+  // analog - minute
+  var handMaterial2 = new THREE.MeshLambertMaterial({
+    color: 0x883311
+  });
+  var hand2 = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 65, 50), handMaterial2);
+  hand2.rotation.x = -Math.PI / 2;
+  hand2.position.set(0, 7.5, -32.5);
+  var head2 = new THREE.Mesh(new THREE.CylinderGeometry(0, 4, 7, 50), handMaterial2);
+  head2.rotation.x = -Math.PI / 2;
+  head2.position.set(0, 7.5, -68.5);
+  
+  handFrame2 = new THREE.Object3D();
+  handFrame2.add(hand2);
+  handFrame2.add(head2);
+  handFrame2.rotation.x = Math.PI / 2;
+  scene.add(handFrame2);
+  
+  // analog - hour
+  var handMaterial3 = new THREE.MeshLambertMaterial({
+    color: 0x222200
+  });
+  var hand3 = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 45, 50), handMaterial3);
+  hand3.rotation.x = -Math.PI / 2;
+  hand3.position.set(0, 7.5, -22.5);
+  var head3 = new THREE.Mesh(new THREE.CylinderGeometry(0, 5, 5, 50), handMaterial3);
+  head3.rotation.x = -Math.PI / 2;
+  head3.position.set(0, 7.5, -47.5);
+  
+  handFrame3 = new THREE.Object3D();
+  handFrame3.add(hand3);
+  handFrame3.add(head3);
+  handFrame3.rotation.x = Math.PI / 2;
+  scene.add(handFrame3);
+  
+  // sector
+  sector = new THREE.CylinderGeometry(90, 90, 10, 50, 1, false, 0, angle);
+  sectorMaterial = new THREE.MeshLambertMaterial({
+  	color: 0x995555,
+    side: THREE.DoubleSide
+  });
+  sectorMesh = new THREE.Mesh(new THREE.CylinderGeometry(90, 90, 10, 50, 1, false, 0, angle), sectorMaterial);
+  sectorMesh.rotation.x = -Math.PI / 2;
+  sectorMesh.position.setZ(7.5);
+  sectorMesh.visible = false;
+  scene.add(sectorMesh);
+  
+  sectorLid = new THREE.Mesh(new THREE.PlaneGeometry(90, 10), sectorMaterial);
+  sectorLid.rotation.y = -Math.PI/2;
+  sectorLid.rotation.x = Math.PI/2;
+  sectorLid.position.set(0, 45, 7.5);
+  sectorLid.visible = false;
+  scene.add(sectorLid);
+  
+  var sectorLid2 = sectorLid.clone();
+  sectorLid2.visible = true;
+  sectorLid2Frame = new THREE.Object3D();
+  sectorLid2Frame.add(sectorLid2);
+  sectorLid2Frame.visible = false;
+  scene.add(sectorLid2Frame);
+ 
+  window.addEventListener('resize', onWindowResize, false);
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function animate() {
+  controls.update();
+  var now = (mode==1)? clock.getElapsedTime() : clock.getDelta();
+  
+  if(angle > Math.PI * 4)
+  	angle -= Math.PI * 4;
+  if (turn){
+    if(mode == 0 || mode == 2){
+    	angle += now * Math.PI * 2 / 60 * speedUp;
+    	angle2 += now * Math.PI * 2 / 3600 * speedUp; 
+      angle3 += now * Math.PI * 2 / 43200 * speedUp;
+    }
+    else if(mode == 1 && now - start >= 1 / speedUp){
+    	start = now;
+      angle += Math.PI *2 / 60;
+      angle2 += Math.PI * 2 / 3600; 
+      angle3 += Math.PI * 2 / 43200;
+    }
+  }
+  // analog
+  handFrame.rotation.y = -angle;
+  handFrame2.rotation.y = -angle2;
+  handFrame3.rotation.y = -angle3;  
+  
+  // sector
+  if(mode == 2){
+  	scene.remove(sectorMesh);
+    if(angle > Math.PI * 2)
+    	sector = new THREE.CylinderGeometry(90, 90, 10, 50, 1, false, 0 + (angle - Math.PI*2), Math.PI*2 - (angle - Math.PI*2));
+    else
+    	sector = new THREE.CylinderGeometry(90, 90, 10, 50, 1, false, 0, angle);
+    sectorMesh = new THREE.Mesh(sector, sectorMaterial);
+    sectorMesh.rotation.x = -Math.PI / 2;
+    sectorMesh.position.setZ(7.5);
+    scene.add(sectorMesh);
+    
+    sectorLid2Frame.rotation.z = -angle;
+  }
+
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+</script>
+</body>
+</html>
