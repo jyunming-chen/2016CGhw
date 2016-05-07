@@ -4,13 +4,585 @@
 
 <head>
 <style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: left;
+  color: #000000
+}
 
+body {
+  overflow: hidden
+}
 
 </style>
 </head>
 
 <body> 
+<div id='info'>
+Computer Graphics<br/>
+Homework 4<br/>
+ObjectLoader<br/>
+<br/>
+Model Sources:<br/>
+<a target="_blank" href="https://clara.io/view/dcb0b529-b3a9-421e-a1ad-dabfd6717bbc">Racer</a>, 
+<a target="_blank" href="https://clara.io/view/30a432ec-3bf8-4d38-b15a-3f6641655cf5">Tree1</a>, 
+<a target="_blank" href="https://clara.io/view/ac16a020-e8e1-4bef-a7be-721f0dbd36d9">Tree2</a><br/>
+<button id="turn">Turn</button> <button id="forestLevel">ForestLevel: 1</button><br/>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r70/three.min.js"></script>
+<script src="https://dl.dropboxusercontent.com/u/3587259/Code/Threejs/OrbitControls.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script id="myVertexShader" type="x-shader/x-vertex">
+    uniform vec3 lightpos;  // world coordinate
+    //uniform float time;     // elapsed time
+    varying vec3 eyelightdir;
+    varying vec3 eyenormal;
+    varying vec4 eyepos;
+    
+    varying vec2 vUv;
+    
+    void main() {
+    		vUv = uv;
+    
+    		//vec3 myPos = position;
+        //myPos.z = 5.0 * sin(myPos.x) * sin(time*4.0);
+        //gl_Position = projectionMatrix * modelViewMatrix * vec4(myPos, 1.0);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 
+        //eyepos = modelViewMatrix * vec4 (myPos, 1.0);
+        eyepos = modelViewMatrix * vec4 (position, 1.0);
+        vec4 eyelightpos= viewMatrix * vec4 (lightpos, 1.0);
+        eyelightdir = normalize (eyelightpos.xyz - eyepos.xyz);
+        eyenormal = normalMatrix * normal;
+    }
+</script>
+<script id="myFragmentShader" type="x-shader/x-fragment">
+    varying vec3 eyelightdir;
+    varying vec3 eyenormal;
+    varying vec4 eyepos;
+    
+    uniform sampler2D fronttex;
+    uniform sampler2D backtex;
+    varying vec2 vUv;
+    
+    void main() {
+    		vec3 color;
+        // double-face texture
+    		if (gl_FrontFacing) {
+            color = texture2D(fronttex, vUv).rgb;
+        } else {
+            vec2 backUv = vec2 (1.0-vUv.s, vUv.t);
+            color = texture2D(backtex, backUv).rgb;
+        }
+    
+        float intensity = dot (normalize (eyenormal), normalize (eyelightdir));    
+        vec3 diffuse = intensity * color;
+    		
+        vec3 h = normalize(-normalize (eyepos.xyz) + normalize (eyelightdir));
+        float shininess = 40.;    
+        vec3 specular = pow (dot (eyenormal, h), shininess) * vec3(0, 0, 0);
+        gl_FragColor = vec4(diffuse + specular, 1.0);
+    }
+</script>
+
+
+<script>
+var scene, renderer, camera;
+var controls;
+var racer, tree, robot, banner, bannerFrame, bannerWidthSeg = 9, bannerHeightSeg = 50;
+var bumpMap;
+var clock, et;
+var turn = true, swing = 0.25, forestFlag = true, forestLevel = 1;
+var angle = 0, roundRadius = 100;
+var glslMaterial;
+var pointLight;
+var treeMesh, treeMesh2, forestArray = [];
+
+init();
+animate();
+
+$("#turn").click(function() {
+  turn = !turn;
+});
+
+$("#forestLevel").click(function() {			// control the number of trees in the forest (to portect GPU)
+  if(forestLevel == 4)
+  	forestLevel = 1;
+  else
+  	forestLevel++;
+  document.getElementById("forestLevel").innerHTML = "ForestLevel: " + forestLevel;
+});
+
+function init()
+{
+	clock = new THREE.Clock(true);
+  et = clock.getElapsedTime();
+  
+	var width = window.innerWidth;
+	var height = window.innerHeight;
+	
+	renderer = new THREE.WebGLRenderer({antialias: true});
+	renderer.setSize (width, height);
+	renderer.setClearColor (0xdddde8);
+	document.body.appendChild (renderer.domElement);
+
+	scene = new THREE.Scene();
+
+	camera = new THREE.PerspectiveCamera (45, width/height, 1, 100000);
+	camera.position.y = 100;
+	camera.position.z = 300;
+	camera.lookAt (new THREE.Vector3(0,0,0));
+
+	controls = new THREE.OrbitControls (camera, renderer.domElement);
+
+	pointLight = new THREE.PointLight (0xffffff);
+  pointLight.position.set (0,1500,1000);
+	scene.add (pointLight);
+
+	var ambientLight = new THREE.AmbientLight (0x111111);
+	scene.add(ambientLight);
+
+////////////////////////////////////////////////////////////////////
+  THREE.ImageUtils.crossOrigin = '';  // no space between a pair of single quotes
+  THREE.TextureLoader.crossOrigin = '';
+
+	// spotlight
+  var light1 = new THREE.SpotLight(0x1122ff, 1.5);
+  light1.position.set(0, 300, 0);
+  light1.angle = Math.PI/2;
+  light1.exponent = 10;
+  //light1.target = tree;				// default: (0, 0, 0)
+  scene.add(light1);
+  
+  // shadow map settings
+  light1.castShadow = true;
+  light1.shadowMapWidth = 4096;
+  light1.shadowMapHeight = 4096;
+  light1.shadowCameraNear = 10;
+  light1.shadowCameraFar = 4000;
+  light1.shadowCameraFov = light1.angle / Math.PI * 180;
+
+	// floor
+	var pTexture = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/snow.jpg");
+  pTexture.wrapS = THREE.RepeatWrapping;
+  pTexture.wrapT = THREE.RepeatWrapping;
+  pTexture.minFilter = THREE.LinearMipMapLinearFilter;
+  var pBumpMap = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/snow2.jpg");
+  pBumpMap.wrapS = THREE.RepeatWrapping;
+  pBumpMap.wrapT = THREE.RepeatWrapping;
+  pBumpMap.minFilter = THREE.LinearMipMapLinearFilter;
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000, 100, 100), new THREE.MeshPhongMaterial({
+  	map:pTexture,
+    side:THREE.DoubleSide,
+    bumpMap:pBumpMap
+    }));
+  floor.rotation.x = -Math.PI/2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+	// racer (car part)
+	racer = new THREE.Object3D();
+	bumpMapRacer = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/textured-glass-bump-map.jpg");
+  var mapRacer = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/models/hw4/ferrari-f1-race-car-threejs/fe0_main2.png");
+  var loaderRacer = new THREE.ObjectLoader();
+  loaderRacer.load ('https://mdes4214.github.io/2016CGhw/models/hw4/ferrari-f1-race-car-threejs/ferrari-f1-race-car2.json', 
+  function ( obj ) {
+    obj.scale.set (10,10,10);
+    obj.rotation.y = Math.PI;
+    racer.add(obj);
+    obj.traverse (
+    	function (mesh) {
+      	if (mesh instanceof THREE.Mesh) {
+        	mesh.material.bumpMap = bumpMapRacer;
+          mesh.material.bumpScale = 0.02;
+          mesh.material.map = mapRacer;
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+        }
+      });
+  });
+	
+  // racer (flag part)
+  var bannerFrontMap = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/banner1.png");
+  var bannerBackMap = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/banner2.png");
+  var flagObj = new THREE.Object3D();
+  var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 60, 20), new THREE.MeshPhongMaterial());
+  glslMaterial = new THREE.ShaderMaterial({
+  			side: THREE.DoubleSide,
+        uniforms: {
+        	lightpos: {type: 'v3', value: pointLight.position},
+          //time: {type: 'f', value: et},
+          fronttex: {
+          	type: 't',
+            value: bannerFrontMap
+          },
+          backtex: {
+            type: 't',
+            value: bannerBackMap
+          }
+        },
+        vertexShader: document.getElementById('myVertexShader').textContent,
+        fragmentShader: document.getElementById('myFragmentShader').textContent
+    	});
+  var bannerGeometry = new THREE.PlaneGeometry(50, 20, bannerWidthSeg, bannerHeightSeg);
+  banner = new THREE.Mesh(bannerGeometry, glslMaterial);
+  
+  bannerFrame = new THREE.Object3D();
+  banner.position.x = 25;
+  bannerFrame.add(banner);
+  bannerFrame.rotation.y = Math.PI/3;
+  bannerFrame.position.y = 55;
+  pole.position.y = 35;
+  flagObj.add(pole);
+  flagObj.add(bannerFrame);
+  flagObj.rotation.x = -Math.PI/6;
+  flagObj.position.z = -10;
+  banner.castShadow = true;
+  banner.receiveShadow = true;
+  pole.castShadow = true;
+  pole.receiveShadow = true;
+  racer.add(flagObj);
+  scene.add(racer);
+  
+  // robot
+  robot = makeRobot();
+  robot.position.y = 90;
+  robot.scale.set(0.5, 0.5, 0.5);
+  scene.add(robot);
+  
+  // tree1
+  tree = new THREE.Object3D();
+  var loaderTree = new THREE.ObjectLoader();
+  var tree1 = "https://mdes4214.github.io/2016CGhw/models/hw4/tree-04-threejs/tree-04.json";
+  var tree2 = "https://mdes4214.github.io/2016CGhw/models/hw4/tree-05-threejs/tree-05.json";
+  //var tree3 = "https://mdes4214.github.io/2016CGhw/models/hw4/tree-threejs/tree.json";
+  loaderTree.load(tree1, 
+  	function(obj){
+  		//obj.scale.set(.01, .01, .01);
+      obj.scale.set(1, 1, 1);
+      tree.add(obj);
+      obj.traverse (
+    	function (mesh) {
+      	if (mesh instanceof THREE.Mesh) {
+        	mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          treeMesh = mesh.clone();
+        }
+      });
+  	});
+  scene.add(tree);
+  
+  // tree2, rare type in the forest
+  loaderTree.load(tree2, 
+  	function(obj){
+      obj.traverse (
+    	function (mesh) {
+      	if (mesh instanceof THREE.Mesh) {
+        	mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          treeMesh2 = mesh.clone();
+        }
+      });
+  	});
+    
+  // snowing
+  var snowGeometry = new THREE.Geometry();
+  var snowMaterials = [];
+  var sprite1 = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/snowflake1.png");
+  var sprite2 = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/snowflake2.png");
+  var sprite3 = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/snowflake3.png");
+  var sprite4 = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/snowflake4.png");
+  var sprite5 = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/snowflake5.png");
+  for (var i = 0; i < 2000; i++ ) {
+    var vertex = new THREE.Vector3();
+    vertex.x = Math.random() * 2000 - 1000;
+    vertex.y = Math.random() * 2000 - 1000;
+    vertex.z = Math.random() * 2000 - 1000;
+    snowGeometry.vertices.push(vertex);
+  }
+  var parameters = [
+    [ [1.0, 0.2, 0.5], sprite2, 30 ],
+    [ [0.95, 0.1, 0.5], sprite3, 22.5 ],
+    [ [0.90, 0.05, 0.5], sprite1, 15 ],
+    [ [0.85, 0, 0.5], sprite5, 12 ],
+    [ [0.80, 0, 0.5], sprite4, 7.5 ]
+  ];
+  for (var i = 0; i < parameters.length; i++ ) {
+    var color  = parameters[i][0];
+    var sprite = parameters[i][1];
+    var size   = parameters[i][2];
+    // note: three.min.js' version must at least r72 (r71->r72: Renamed PointCloudMaterial to PointsMaterial.)
+    //snowMaterials[i] = new THREE.PointsMaterial( { size: size, map: sprite, blending: THREE.AdditiveBlending, depthTest: false, transparent: true } );
+    snowMaterials[i] = new THREE.PointCloudMaterial( { size: size, map: sprite, blending: THREE.AdditiveBlending, depthTest: false, transparent: true } );
+    snowMaterials[i].color.setHSL(color[0], color[1], color[2]);
+    // note: three.min.js' version must at least r72 (r71->r72: Renamed PointCloud to Points.)
+    //var particles = new THREE.Points(snowGeometry, snowMaterials[i]);
+    var particles = new THREE.PointCloud(snowGeometry, snowMaterials[i]);
+    particles.rotation.x = Math.random() * 6;
+    particles.rotation.y = Math.random() * 6;
+    particles.rotation.z = Math.random() * 6;
+    scene.add( particles );
+  }
+
+	// renderer shadow set
+	renderer.shadowMapEnabled = true;
+  renderer.shadowMapType = THREE.PCFShadowMap;
+}
+
+function animate()
+{
+	controls.update();
+	var dt = clock.getDelta();
+  et = clock.getElapsedTime();
+	
+  // forest, must after the tree1 and tree2 loaded
+  if(treeMesh !== undefined && treeMesh2 !== undefined && forestFlag){
+  	makeForest();
+  	forestFlag = false;
+  }
+  
+  // racer and robot running
+	if (racer !== undefined && turn) { 
+		racer.position.set (roundRadius*Math.cos(angle), 0, -roundRadius*Math.sin(angle));
+		racer.rotation.y = angle + Math.PI;
+    robot.position.set (roundRadius*Math.cos(angle+20), 90+25*Math.cos(4*(angle+20)), -roundRadius*Math.sin(angle+20));
+		robot.rotation.y = angle+20 + Math.PI;
+		angle += dt;
+	}
+  
+  //glslMaterial.uniforms.time.value = et;
+
+	// banner swinging
+  bannerFrame.rotation.y = Math.PI/3 + swing * Math.sin(et * 4);
+  for(var i = 0; i < bannerHeightSeg+1; i++){
+    for(var j = 0; j < bannerWidthSeg+1; j++){
+      var p = i * (bannerWidthSeg+1) + j;
+      if(j < (bannerWidthSeg+1) * 4 / 8)
+        banner.geometry.vertices[p].z = 2 * Math.sin(banner.geometry.vertices[p].x) * Math.sin(et * 4);
+      else if(j < (bannerWidthSeg+1) * 3 / 8)
+        banner.geometry.vertices[p].z = 3 * Math.sin(banner.geometry.vertices[p].x) * Math.sin(et * 4);
+      else
+        banner.geometry.vertices[p].z = 5 * Math.sin(banner.geometry.vertices[p].x) * Math.sin(et * 4);
+    }
+  }
+  banner.geometry.computeFaceNormals();
+  banner.geometry.computeVertexNormals();
+  banner.geometry.normalsNeedUpdate = true;
+  banner.geometry.verticesNeedUpdate = true;
+  
+	requestAnimationFrame ( animate ); 
+	render();
+}
+
+function render(){
+	// control the number of trees in the forest (to portect GPU)
+  // two ways: 1.button control(ForestLevel). 2.camera distance(longer->less)
+	var origin = new THREE.Vector3(0, 0, 0);
+	var d = camera.position.distanceTo(origin);
+  for(var i = 0; i < forestArray.length; i++){
+  	var obj = forestArray[i];
+    var objD = obj.position.distanceTo(origin);
+    if(d <= 600 || forestLevel == 4)
+    	scene.add(obj);
+    if((d > 600 && d <= 1200) || forestLevel == 3){
+    	if(objD > 1200)
+      	scene.remove(obj);
+    	else
+      	scene.add(obj);
+    }
+    if((d > 1200 && d <= 1800) || forestLevel == 2){
+    	if(objD > 900)
+      	scene.remove(obj);
+    	else
+      	scene.add(obj);
+    }
+    if(d > 1800 || forestLevel == 1){
+    	if(objD > 600)
+      	scene.remove(obj);
+    	else
+      	scene.add(obj);
+    }
+  }
+  
+  // control the snow flakes falling
+  for ( i = 0; i < scene.children.length; i++ ) {
+    var obj = scene.children[i];
+    if (obj instanceof THREE.PointCloud) {
+      obj.rotation.y = et * 0.02 * i;
+    }
+  }
+  
+	renderer.render (scene, camera);
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function makeRobot(){
+	var combination = new THREE.Object3D();
+  
+  // head
+  var faceTexture = THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw4/head.jpg');
+  var innerMaterials = [];
+  innerMaterials.push(new THREE.MeshPhongMaterial({side:THREE.DoubleSide}));
+  innerMaterials.push(new THREE.MeshPhongMaterial({side:THREE.DoubleSide}));
+  innerMaterials.push(new THREE.MeshPhongMaterial({side:THREE.DoubleSide}));
+  innerMaterials.push(new THREE.MeshPhongMaterial({side:THREE.DoubleSide}));
+  innerMaterials.push(new THREE.MeshPhongMaterial({visible:false}));
+  innerMaterials.push(new THREE.MeshPhongMaterial({side:THREE.DoubleSide, map:faceTexture}));
+  var outerMaterials = [];					// note: DoubleSide may cause shadow problem like z-fighting
+  outerMaterials.push(new THREE.MeshPhongMaterial());	
+  outerMaterials.push(new THREE.MeshPhongMaterial());
+  outerMaterials.push(new THREE.MeshPhongMaterial());
+  outerMaterials.push(new THREE.MeshPhongMaterial());
+  outerMaterials.push(new THREE.MeshPhongMaterial({visible:false}));
+  outerMaterials.push(new THREE.MeshPhongMaterial());
+	var inner = new THREE.Mesh(new THREE.BoxGeometry(30, 20, 3), new THREE.MeshFaceMaterial(innerMaterials));
+  var outer = new THREE.Mesh(new THREE.BoxGeometry(35, 25, 6), new THREE.MeshFaceMaterial(outerMaterials));
+  outer.position.z = -1.5;
+  
+  var ring1 = new THREE.Mesh(new THREE.PlaneGeometry(35, 2.5), new THREE.MeshPhongMaterial());
+  var ring2 = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 20), new THREE.MeshPhongMaterial());
+  var ring3 = ring1.clone();
+  var ring4 = ring2.clone();
+  ring1.position.set(0, 11.25, 1.5);
+  ring3.position.set(0, -11.25, 1.5);
+  ring2.position.set(16.25, 0, 1.5);
+  ring4.position.set(-16.25, 0, 1.5);
+  
+  var antennaL = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 10, 30, 30), new THREE.MeshPhongMaterial());
+  var antennaR = antennaL.clone();
+  antennaL.position.set(-2, 15, -1.5);
+  antennaR.position.set(2, 15, -1.5);
+  antennaL.rotation.z = Math.PI/4;
+  antennaR.rotation.z = -Math.PI/4;
+  
+  outer.castShadow = true;
+  outer.receiveShadow = true;
+  antennaL.castShadow = true;
+  antennaL.receiveShadow = true;
+  antennaR.castShadow = true;
+  antennaR.receiveShadow = true;
+  combination.add(inner);
+  combination.add(outer);
+  combination.add(ring1);
+  combination.add(ring2);
+  combination.add(ring3);
+  combination.add(ring4);
+  combination.add(antennaL);
+  combination.add(antennaR);
+  
+  // body
+  var jsonBody = {
+        "vertices": [-15,-10,-4.5,  15,-10,-4.5,  15,10,-4.5,  -15,10,-4.5,  
+        							-7.5,-5,-10,	7.5,-5,-10,		7.5,5,-10,		-7.5,5,-10],
+        "faces": [1,0,1,2,3,  1,3,2,6,7,  1,2,1,5,6,  1,1,0,4,5,  1,0,3,7,4,  1,4,7,6,5]
+      };
+	var jsonBodyLoader = new THREE.JSONLoader();
+  var parseObjBody = jsonBodyLoader.parse(jsonBody);
+	var body = new THREE.Mesh(parseObjBody.geometry, new THREE.MeshPhongMaterial());
+  body.castShadow = true;
+  body.receiveShadow = true;
+	combination.add(body);
+  
+  // hands
+  var handL = new THREE.Object3D(), handL2 = new THREE.Object3D();
+  var ball1 = new THREE.Mesh(new THREE.SphereGeometry(3, 30, 30), new THREE.MeshPhongMaterial({side:THREE.DoubleSide}));
+  var arm1 = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 15, 30, 30), new THREE.MeshPhongMaterial({side:THREE.DoubleSide}));
+  var ball2 = ball1.clone(), ball3 = ball1.clone(), arm2;  
+  arm1.position.y = -2-7.5;
+  arm2 = arm1.clone();
+  ball3.position.y = -2-14-3;
+  handL2.add(ball2);
+  handL2.add(ball3);
+  handL2.add(arm2);
+  handL2.position.y = -2-14-3;
+  handL.add(ball1);
+  handL.add(arm1);
+  
+  arm1.castShadow = true;
+  arm1.receiveShadow = true;
+  arm2.castShadow = true;
+  arm2.receiveShadow = true;
+  ball1.castShadow = true;
+  ball1.receiveShadow = true;
+  ball2.castShadow = true;
+  ball2.receiveShadow = true;
+  ball3.castShadow = true;
+  ball3.receiveShadow = true;
+  
+  var handR = handL.clone(), handR2 = handL2.clone();
+  handL.add(handL2);
+  handL.position.set(18, 0, -1.5) ;
+  handL.rotation.z = Math.PI/6;
+  handL.rotation.x = -Math.PI/6;
+  handL2.rotation.z = -Math.PI/8;
+  handL2.rotation.x = -Math.PI/8;
+  handR.add(handR2);
+  handR.position.set(-18, 0, -1.5) ;
+  handR.rotation.z = -Math.PI/6;
+  handR.rotation.x = -Math.PI/6;
+  handR2.rotation.z = Math.PI/8;
+  handR2.rotation.x = -Math.PI/8;
+  
+  combination.add(handL);
+  combination.add(handR);
+  
+  // photo board
+  var photoTexture = THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw4/photo.jpg');
+  var boardMaterials = [];
+  boardMaterials.push(new THREE.MeshPhongMaterial({side:THREE.DoubleSide}));
+  boardMaterials.push(new THREE.MeshPhongMaterial({side:THREE.DoubleSide}));
+  boardMaterials.push(new THREE.MeshPhongMaterial({side:THREE.DoubleSide}));
+  boardMaterials.push(new THREE.MeshPhongMaterial({side:THREE.DoubleSide}));
+  boardMaterials.push(new THREE.MeshPhongMaterial({side:THREE.DoubleSide, map:photoTexture}));
+  boardMaterials.push(new THREE.MeshPhongMaterial({side:THREE.DoubleSide}));
+  var board = new THREE.Mesh(new THREE.BoxGeometry(60, 45, 3), new THREE.MeshFaceMaterial(boardMaterials));
+  board.position.set(0, -48.5, 21.5);
+  board.castShadow = true;
+  combination.add(board);
+  
+	return combination;
+}
+
+function makeForest(){
+	for(var i = -2300; i <= 2300; i += 151){
+  	for(var j = -2300; j <= 2300; j += 301){
+    	if(i*i + j*j > 300*300 ){
+        var treeTmp;
+        var rand = Math.random();
+        
+        // rare type
+        if(rand < 0.2)
+        	treeTmp = treeMesh2.clone();
+        else
+        	treeTmp = treeMesh.clone();
+          
+        // to make trees crossover (more complex)
+        if(i % 2){
+        	treeTmp.position.set(i, 0, j + 150);
+        	treeTmp.scale.set(1.5, 1.5, 1.5);
+        }
+        else{
+        	treeTmp.position.set(i, 0, j);
+       		treeTmp.scale.set(1.5, 1.5, 3);
+       	}
+        if(j % 2)
+        	treeTmp.scale.set(3, 3, 3);
+          
+        forestArray.push(treeTmp);
+        scene.add(treeTmp);
+      }
+    }
+  }
+}
+</script>
 
 
 </body>
