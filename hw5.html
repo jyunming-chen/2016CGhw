@@ -16,7 +16,7 @@
   position: absolute;
   top: 30px;
   right: 1%;
-  height: 600px;
+  height: 1000px;
   //width: 100px;
 }
 
@@ -98,8 +98,9 @@ Note: shading and cooridnate system only apply to ShaderMaterial
 var scene, renderer, camera;
 var controls;
 var originTeaport, aroundTeaport, plane, spotLignt, directionalLight, pointLight;
+var slBall, slBallF, dlBall, dlBallF, plBall, plBallF;
 var pTexture, shaderMaterial;
-var angle = 0;
+var angle = 0, angle_sl = 0;
 
 init();
 animate();
@@ -119,6 +120,7 @@ function init() {
   scene = new THREE.Scene();
 
   camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000);
+  camera.position.y = 200;
   camera.position.z = 200;
   camera.lookAt(new THREE.Vector3(0, 0, 0));
 
@@ -136,6 +138,7 @@ function init() {
     this.material_ot = 'PhongMaterial';
     this.material_p = 'PhongMaterial';
     this.use_sl = true;
+    this.round_sl = true;
 		this.color_sl = '#ffffff';
 		this.position_x_sl = 200;
 		this.position_y_sl = 300;
@@ -165,6 +168,7 @@ function init() {
   f3.add(gcontrols, 'material_p', ['BasicMaterial', 'LambertMaterial', 'PhongMaterial']);
   var f4 = gui.addFolder('Spot Light');
   f4.add(gcontrols, 'use_sl', true, false);
+  f4.add(gcontrols, 'round_sl', true, false);
   f4.addColor(gcontrols, 'color_sl');
   f4.add(gcontrols, 'position_x_sl', -500, 500);
   f4.add(gcontrols, 'position_y_sl', -500, 500);
@@ -244,6 +248,15 @@ function init() {
   spotLight.shadowCameraFov = spotLight.angle / Math.PI * 180;
   scene.add(spotLight);
   
+  // spot light ball
+  slBall = new THREE.Mesh(new THREE.CylinderGeometry(1, 5, 10, 10, 5), new THREE.MeshBasicMaterial({wireframe: true}));
+  slBallF = new THREE.Object3D();
+  slBall.rotation.x = -Math.PI/2;
+  slBallF.add(slBall);
+  slBallF.position.set(200, 300, 200);
+  slBallF.lookAt(new THREE.Vector3(0, 0, 0));
+  scene.add(slBallF);
+  
   // directional light
   directionalLight = new THREE.DirectionalLight(0xffffff);
   directionalLight.position.set(200, 300, 200);
@@ -260,11 +273,27 @@ function init() {
   directionalLight.shadowDarkness = 0.7;
   scene.add(directionalLight);
   
+  // directional light ball
+  dlBall = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 10, 10, 5), new THREE.MeshBasicMaterial({wireframe: true}));
+  dlBallF = new THREE.Object3D();
+  dlBall.rotation.x = -Math.PI/2;
+  dlBallF.add(dlBall);
+  dlBallF.position.set(200, 300, 200);
+  dlBallF.lookAt(new THREE.Vector3(0, 0, 0));
+  scene.add(dlBallF);
+  
   // point light
   pointLight = new THREE.PointLight(0xffffff);
   pointLight.position.set(200, 300, 200);
-  //pointLight.castShadow = true;
   scene.add(pointLight);
+  
+  // point light ball
+  plBall = new THREE.Mesh(new THREE.SphereGeometry(5, 10, 10), new THREE.MeshBasicMaterial({wireframe: true}));
+  plBallF = new THREE.Object3D();
+  plBallF.add(plBall);
+  plBallF.position.set(200, 300, 200);
+  plBallF.lookAt(new THREE.Vector3(0, 0, 0));
+  scene.add(plBallF);
   
   // renderer shadow set
   renderer.shadowMapEnabled = true;
@@ -364,7 +393,18 @@ function animate() {
     else
     	scene.remove(spotLight);
     spotLight.color = new THREE.Color(gcontrols.color_sl);
-    spotLight.position.set(gcontrols.position_x_sl, gcontrols.position_y_sl, gcontrols.position_z_sl);
+    if(gcontrols.round_sl)
+    	angle_sl += 0.01;
+    spotLight.position.set (gcontrols.position_x_sl*Math.cos(angle_sl), gcontrols.position_y_sl, gcontrols.position_z_sl*Math.sin(angle_sl));
+      
+    // spot light ball
+    if(gcontrols.use_sl)
+    	scene.add(slBallF);
+    else
+    	scene.remove(slBallF);
+    slBallF.position.set (gcontrols.position_x_sl*Math.cos(angle_sl), gcontrols.position_y_sl, gcontrols.position_z_sl*Math.sin(angle_sl));
+    slBallF.lookAt(new THREE.Vector3(0, 0, 0));
+    slBall.material.color = new THREE.Color(gcontrols.color_sl);
     
     // directional light gui-controls
     if(gcontrols.use_dl)
@@ -374,6 +414,15 @@ function animate() {
     directionalLight.color = new THREE.Color(gcontrols.color_dl);
     directionalLight.position.set(gcontrols.position_x_dl, gcontrols.position_y_dl, gcontrols.position_z_dl);
     
+    // directional light ball
+    if(gcontrols.use_dl)
+    	scene.add(dlBallF);
+    else
+    	scene.remove(dlBallF);
+    dlBallF.position.set(gcontrols.position_x_dl, gcontrols.position_y_dl, gcontrols.position_z_dl);
+    dlBallF.lookAt(new THREE.Vector3(0, 0, 0));
+    dlBall.material.color = new THREE.Color(gcontrols.color_dl);
+    
     // point light gui-controls
     if(gcontrols.use_pl)
     	scene.add(pointLight);
@@ -381,6 +430,15 @@ function animate() {
     	scene.remove(pointLight);
     pointLight.color = new THREE.Color(gcontrols.color_pl);
     pointLight.position.set(gcontrols.position_x_pl, gcontrols.position_y_pl, gcontrols.position_z_pl);
+    
+    // point light ball
+    if(gcontrols.use_pl)
+    	scene.add(plBallF);
+    else
+    	scene.remove(plBallF);
+    plBallF.position.set(gcontrols.position_x_pl, gcontrols.position_y_pl, gcontrols.position_z_pl);
+    plBallF.lookAt(new THREE.Vector3(0, 0, 0));
+    plBall.material.color = new THREE.Color(gcontrols.color_pl);
   }
   
   requestAnimationFrame(animate);
