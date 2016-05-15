@@ -54,7 +54,7 @@ Note: shading and cooridnate system only apply to ShaderMaterial
   vec4 pos_v;							// vertex position (per-vertex shading)
 	
   void perVertexShading() {
-  	if (pos_v.x > 0.0) 
+  	if (pos_v.x < 0.0) 
     	color = vec3 (1,1,1);
     else
     	color = vec3 (0,0,0);
@@ -86,7 +86,7 @@ Note: shading and cooridnate system only apply to ShaderMaterial
   vec3 color_p;					// fragment color (per-pixel shading)
   
   void perPixelShading() {
-  	if (pos_p.x > 0.0) 
+  	if (pos_p.x < 0.0) 
     	color_p = vec3 (1,1,1);
     else
     	color_p = vec3 (0,0,0);
