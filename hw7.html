@@ -81,7 +81,7 @@ RenderTarget, Multi-pass Rendering, Monochrome Filter, ...<br/>
 <script>
 var renderer, camera, controls, gcontrols;
 var scene, sceneRTT, sceneMono, sceneColor, rtTexture, torus;
-var rttmaterial, quad, toriiMaterial;
+var rttmaterial, quad, toriiMaterial, pMaterial;
 var cameraRTT;
 var blockerMaterials = [];
 
@@ -110,8 +110,7 @@ function init()
 	renderer.autoClear = false;
   
 	camera = new THREE.PerspectiveCamera (45, window.innerWidth/window.innerHeight, 0.1, 10000);
-	camera.position.y = 0;
-	camera.position.z = 400;
+	camera.position.set(-400, 300, 0);
 	camera.lookAt (new THREE.Vector3(0,0,0));
 
 	var ambientLight = new THREE.AmbientLight(0x222222);
@@ -150,10 +149,10 @@ function init()
   sceneRTT.add(spotLight);*/
   
 	// render target - grass
-  var pTexture = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/grass.jpg");
-  pTexture.repeat.set(15, 15);
+  var pTexture = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw7/skybox2/negy.png");
+  /*pTexture.repeat.set(5, 5);
   pTexture.wrapS = THREE.RepeatWrapping;
-  pTexture.wrapT = THREE.RepeatWrapping;
+  pTexture.wrapT = THREE.RepeatWrapping;*/
   var grassMaterial = new THREE.MeshPhongMaterial({
   	map:pTexture, 
     side:THREE.DoubleSide,
@@ -179,16 +178,51 @@ function init()
     bumpScale: 0.3
   });
   blockerMaterials.push(toriiMaterial);
+  var pTexture2 = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/grass.jpg");
+  pMaterial = new THREE.MeshPhongMaterial({map:pTexture2});
+  blockerMaterials.push(pMaterial);
   arrangeTorii();
+   
+  // skybox (cubemap)
+  // urls of the images, one per half axis
+  var urls = [
+    "https://mdes4214.github.io/2016CGhw/images/hw7/skybox2/posx.png",
+    "https://mdes4214.github.io/2016CGhw/images/hw7/skybox2/negx.png",
+    "https://mdes4214.github.io/2016CGhw/images/hw7/skybox2/posy.png",
+    "https://mdes4214.github.io/2016CGhw/images/hw7/skybox2/negy.png",
+    "https://mdes4214.github.io/2016CGhw/images/hw7/skybox2/posz.png",
+    "https://mdes4214.github.io/2016CGhw/images/hw7/skybox2/negz.png"
+  ];
+
+  var cubemap = THREE.ImageUtils.loadTextureCube(urls);
+  cubemap.format = THREE.RGBFormat;
+
+  var shader = THREE.ShaderLib[ "cube" ];
+  shader.uniforms[ "tCube" ].texture = cubemap;
+  var cubeMaterial = new THREE.ShaderMaterial( {
+    fragmentShader: shader.fragmentShader,
+    vertexShader: shader.vertexShader,
+    uniforms: shader.uniforms,
+    depthWrite: true,
+    side: THREE.BackSide
+  });
+  var skybox = new THREE.Mesh( new THREE.BoxGeometry( 1000, 1000, 1000 ), cubeMaterial );
+  skybox.position.y = 200;
   
-  /*var torusMaterial = new THREE.MeshLambertMaterial({color:0xff1234});
-	torus = new THREE.Mesh (new THREE.TorusGeometry(10, 3, 16, 100), torusMaterial);
-	torus.scale.set (10,10,10);
-  torus.rotation.x = Math.PI/2;
-	sceneRTT.add(torus);
-  sceneMono.add(torus.clone());
-  blockerMaterials.push(torusMaterial);*/
+  // the center piece
+  var reflectionMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff, //0xcccccc,
+    envMap: cubemap
+  });
+  var torus = new THREE.Mesh(
+    new THREE.TorusKnotGeometry(60,20,100),
+    reflectionMaterial
+  );
+  torus.scale.set(0.01, 0.01, 0.01);
+  sceneRTT.add(skybox);
+  sceneRTT.add(torus);
   
+  // render target
 	scene = new THREE.Scene();
 	rttmaterial = new THREE.ShaderMaterial( {
 		uniforms: {
@@ -206,32 +240,11 @@ function init()
 	scene.add (quad);
   cameraRTT = new THREE.OrthographicCamera(-50, 50, 50, -50, -10, 10); 
   
-  // blocker
-  //console.log(backgroundObject.length);
-  /*var t = 0;
-  for(var i = 0; i < backgroundObject.length; i++){
-  	var tmp = backgroundObject[i].clone();
-    if(tmp.material !== undefined){
-    	t++
-    	tmp.material = tmp.material.clone();
-    	tmp.material.colorWrite = false;		// don't output to color buffer
-    	sceneMono.add(tmp);
-    }
-  }
-  console.log(t);*/
-  
   // main object
   sceneColor = new THREE.Scene();
   // Danboard
   var db = makeDanboard();
   sceneColor.add(db);
-  
-  /*var column = new THREE.Mesh(new THREE.BoxGeometry(60, 150, 20),
-    new THREE.MeshLambertMaterial({
-      color: 0xff1234
-    }));
-  sceneColor.add(column);
-  column.castShadow = true;*/
   
   sceneColor.add(ambientLight.clone());
   sceneColor.add(pointLight.clone());
@@ -258,7 +271,6 @@ function animate()
 	renderer.clear();
   
   // render to the rtTexture
-  console.log(blockerMaterials.length);
   for(var i = 0; i < blockerMaterials.length; i++)
   	blockerMaterials[i].colorWrite = true;
  	renderer.setClearColor (0x888800);
@@ -277,55 +289,74 @@ function animate()
 }
 
 function arrangeTorii(){
-	var t = [];
+	var pWidth = 160;
+  var p = [];
+  
+  var t = [];
   for(var i = 0; i < 20; i++)
   	t.push(makeTorii());
-	/*var t1 = makeTorii();
-  var t2 = makeTorii();
-  var t3 = makeTorii();
-  var t4 = makeTorii();
-  var t5 = makeTorii();
-  var t6 = makeTorii();
-  var t7 = makeTorii();
-  var t8 = makeTorii();
-  var t9 = makeTorii();
-  var t10 = makeTorii();
-  var t11 = makeTorii();
-  var t12 = makeTorii();
-  var t13 = makeTorii();
-  var t14 = makeTorii();
-  var t15 = makeTorii();
-  var t16 = makeTorii();
-  var t17 = makeTorii();
-  var t18 = makeTorii();
-  var t19 = makeTorii();
-  var t20 = makeTorii();*/
-  
-  t[0].position.set(20, 0, -480);
-  t[1].position.set(20, 0, -430);
-  t[2].position.set(20, 0, -380);
-  t[3].position.set(20, 0, -330);
-  t[4].position.set(20, 0, -280);
-  t[5].position.set(20, 0, -230);
-  t[6].position.set(20, 0, -180);
-  t[7].position.set(20, 0, -130);
-  t[8].position.set(20, 0, -80);
+   
+  t[0].position.set(-200*Math.cos(Math.PI*9/24)+250, 0, -430);
+  t[0].rotation.y = -Math.PI*9/24;
+  t[1].position.set(-200*Math.cos(Math.PI*8/24)+220, 0, -430);
+  t[1].rotation.y = -Math.PI*8/24;
+  t[2].position.set(-200*Math.cos(Math.PI*7/24)+220, 0, -380);
+  t[2].rotation.y = -Math.PI*7/24;
+  t[3].position.set(-200*Math.cos(Math.PI*6/24)+220, 0, -330);
+  t[3].rotation.y = -Math.PI*6/24;
+  t[4].position.set(-200*Math.cos(Math.PI*5/24)+220, 0, -280);
+  t[4].rotation.y = -Math.PI*5/24;
+  t[5].position.set(-200*Math.cos(Math.PI*4/24)+220, 0, -230);
+  t[5].rotation.y = -Math.PI*4/24;
+  t[6].position.set(-200*Math.cos(Math.PI*3/24)+220, 0, -180);
+  t[6].rotation.y = -Math.PI*3/24;
+  t[7].position.set(-200*Math.cos(Math.PI*2/24)+220, 0, -130);
+  t[7].rotation.y = -Math.PI*2/24;
+  t[8].position.set(-200*Math.cos(Math.PI*1/24)+220, 0, -80);
+  t[8].rotation.y = -Math.PI*1/24;
   t[9].position.set(20, 0, -30);
   t[10].position.set(20, 0, 20);
-  t[11].position.set(20, 0, 70);
-  t[12].position.set(20, 0, 120);
-  t[13].position.set(20, 0, 170);
-  t[14].position.set(20, 0, 220);
-  t[15].position.set(20, 0, 270);
-  t[16].position.set(20, 0, 320);
-  t[17].position.set(20, 0, 370);
-  t[18].position.set(20, 0, 420);
-  t[19].position.set(20, 0, 470);
+  t[11].position.set(20, 20, 70);
+  var p1 = new THREE.Mesh(new THREE.BoxGeometry(pWidth, 20, 50), pMaterial);
+  p1.position.set(20, 10, 70);
+  p.push(p1);
+ 	t[12].position.set(20, 40, 120);
+  var p2 = new THREE.Mesh(new THREE.BoxGeometry(pWidth, 40, 50), pMaterial);
+  p2.position.set(20, 20, 120);
+  p.push(p2);
+  t[13].position.set(20, 60, 170);
+  var p3 = new THREE.Mesh(new THREE.BoxGeometry(pWidth, 60, 50), pMaterial);
+  p3.position.set(20, 30, 170);
+  p.push(p3);
+  t[14].position.set(20, 80, 220);
+  t[15].position.set(20, 80, 270);
+  t[16].position.set(20, 80, 320);
+  t[17].position.set(20, 80, 370);
+  var p4 = new THREE.Mesh(new THREE.BoxGeometry(pWidth, 80, 200), pMaterial);
+  p4.position.set(20, 40, 295);
+  p.push(p4);
+  t[18].position.set(20, 100, 420);
+  var p5 = new THREE.Mesh(new THREE.BoxGeometry(pWidth, 100, 50), pMaterial);
+  p5.position.set(20, 50, 420);
+  p.push(p5);
+  t[19].position.set(20, 120, 470);
+  var p6 = new THREE.Mesh(new THREE.BoxGeometry(pWidth, 120, 50), pMaterial);
+  p6.position.set(20, 60, 470);
+  p.push(p6);
   
+  var pBoard = new THREE.Mesh(new THREE.BoxGeometry(30, 40, 5), toriiMaterial);
+  pBoard.position.set(20, 210, 480);
+  pBoard.rotation.x = Math.PI/9;
+  sceneRTT.add(pBoard);
+  sceneMono.add(pBoard.clone());
   
-  for(var i = 0; i < 20; i++){
+  for(var i = 0; i < t.length; i++){
   	sceneRTT.add(t[i]);
   	sceneMono.add(t[i].clone());
+  }
+  for(var i = 0; i < p.length; i++){
+  	sceneRTT.add(p[i]);
+  	sceneMono.add(p[i].clone());
   }
 }
 
@@ -411,7 +442,7 @@ function makeDanboard(){
   danboard.rotation.z = 0;
   danboard.position.x = 0;
   danboard.position.y = 22.167838106403405;
-  danboard.position.z = 90;
+  danboard.position.z = 80;
   
   return danboard;
 }
@@ -419,12 +450,12 @@ function makeDanboard(){
 function makeHead(){
 	THREE.ImageUtils.crossOrigin = '';
 	var materials = [];
-  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/Oi0S4ke.jpg'), side:THREE.DoubleSide}));
-  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/ucFLAON.jpg'), side:THREE.DoubleSide}));
-  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/jX22xkH.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/head2.JPG'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/head4.JPG'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/head3.JPG'), side:THREE.DoubleSide}));
   materials.push(new THREE.MeshPhongMaterial({visible:false}));
-  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/fA2rgLf.jpg'), side:THREE.DoubleSide}));
-  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/yN2Nkvp.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/head1.JPG'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/head5.JPG'), side:THREE.DoubleSide}));
   
   var box = new THREE.Mesh(new THREE.BoxGeometry(headX, headY, headZ), new THREE.MeshFaceMaterial(materials));
   var ball = makeLinkBall(headBallRadius);
@@ -448,8 +479,8 @@ function makeTorso(){
   materials.push(new THREE.MeshPhongMaterial({color:boxColor, side:THREE.DoubleSide}));
   materials.push(new THREE.MeshPhongMaterial({color:boxColor, side:THREE.DoubleSide}));
   materials.push(new THREE.MeshPhongMaterial({visible:false}));
-  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/OT3on1d.jpg'), side:THREE.DoubleSide}));
-  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/1ctWiHd.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/body1.JPG'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('https://mdes4214.github.io/2016CGhw/images/hw2/body2.JPG'), side:THREE.DoubleSide}));
   
   var box = new THREE.Mesh(new THREE.BoxGeometry(torsoX, torsoY, torsoZ), new THREE.MeshFaceMaterial(materials));
   
