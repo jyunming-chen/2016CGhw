@@ -9,8 +9,6 @@ body {
     color: #111;
     margin: 0px;
     overflow: hidden;
-    font-family: Monospace;
-    font-size: 10px;
     position: absolute;
 }
 #info {
@@ -28,7 +26,6 @@ body {
   height: 600px;
   //width: 100px;
 }
-
 </style>
 </head>
 
@@ -80,12 +77,21 @@ RenderTarget, Multi-pass Rendering, Monochrome Filter, ...<br/>
 	gl_FragColor = vec4 (rgb, 1.0);
 	}
 </script>
+
 <script>
 var renderer, camera, controls, gcontrols;
-var pointLight;
 var scene, sceneRTT, sceneMono, sceneColor, rtTexture, torus;
-var rttmaterial, quad;
+var rttmaterial, quad, toriiMaterial;
 var cameraRTT;
+var blockerMaterials = [];
+
+// danboard data
+var boxColor = 0xC0A47C;
+var headX = 29.5, headY = 19, headZ = 20.6, headBallRadius = 5;
+var torsoX = 14.8, torsoY = 23.6, torsoZ = 14.8;
+var handX = 5, handY = 19, handZ = 5, ballRadius = 2.5;
+var legX = 6.8, legY = 18, legZ = 14.8;
+var head, torso, handR, handL, legR, legL, lidFrame, lidFrame2, lidFrame3, lidFrame4, body, danboard;
 
 init();
 animate();
@@ -108,10 +114,14 @@ function init()
 	camera.position.z = 400;
 	camera.lookAt (new THREE.Vector3(0,0,0));
 
+	var ambientLight = new THREE.AmbientLight(0x222222);
+  
 	// add control here (after the camera is defined)
 	controls = new THREE.OrbitControls (camera, renderer.domElement);
 //////////////////////////////////////////////////////////////////////////
-	// gui control
+	THREE.ImageUtils.crossOrigin = '';
+  
+  // gui control
   gcontrols = new function() {
     this.fade = 5.0;
   }
@@ -119,17 +129,65 @@ function init()
   gui.domElement.id = 'gui';
   gui.add(gcontrols, 'fade', 0.1, 5.0);
 	
-  // render target
+  // render target - light
 	sceneRTT = new THREE.Scene();	
-	pointLight = new THREE.PointLight (0xffffff);
+  sceneMono = new THREE.Scene();
+	var pointLight = new THREE.PointLight (0xffffff);
 	pointLight.position.set (0,300,200);
 	sceneRTT.add (pointLight);
-
-	torus = new THREE.Mesh (new THREE.TorusGeometry(10, 3, 16, 100),
-	new THREE.MeshLambertMaterial({color:0xff1234}));
+  sceneRTT.add(ambientLight);
+	
+  /*var spotLight = new THREE.SpotLight(0xffffff, 1.5);
+  spotLight.position.set(0, 300, 0);
+  spotLight.angle = Math.PI/2;
+  spotLight.exponent = 10;
+  spotLight.castShadow = true;
+  spotLight.shadowMapWidth = 4096;
+  spotLight.shadowMapHeight = 4096;
+  spotLight.shadowCameraNear = 10;
+  spotLight.shadowCameraFar = 4000;
+  spotLight.shadowCameraFov = spotLight.angle / Math.PI * 180;
+  sceneRTT.add(spotLight);*/
+  
+	// render target - grass
+  var pTexture = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw4/grass.jpg");
+  pTexture.repeat.set(15, 15);
+  pTexture.wrapS = THREE.RepeatWrapping;
+  pTexture.wrapT = THREE.RepeatWrapping;
+  var grassMaterial = new THREE.MeshPhongMaterial({
+  	map:pTexture, 
+    side:THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -1.0,
+    polygonOffsetUnits: 1.0
+    });
+  var grass = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), grassMaterial);
+  grass.rotation.x = -Math.PI/2;
+  grass.receiveShadow = true;
+  sceneRTT.add(grass);
+  sceneMono.add(grass.clone());
+  blockerMaterials.push(grassMaterial);
+  
+  // render target - torii
+  var treeBump = THREE.ImageUtils.loadTexture("https://mdes4214.github.io/2016CGhw/images/hw7/tree_bump.jpg");
+  //treeBump.repeat.set(15, 15);
+  //treeBump.wrapS = THREE.RepeatWrapping;
+  //treeBump.wrapT = THREE.RepeatWrapping;
+  toriiMaterial = new THREE.MeshPhongMaterial({
+  	color: 0xff3412, 
+    bumpMap: treeBump,
+    bumpScale: 0.3
+  });
+  blockerMaterials.push(toriiMaterial);
+  arrangeTorii();
+  
+  /*var torusMaterial = new THREE.MeshLambertMaterial({color:0xff1234});
+	torus = new THREE.Mesh (new THREE.TorusGeometry(10, 3, 16, 100), torusMaterial);
 	torus.scale.set (10,10,10);
   torus.rotation.x = Math.PI/2;
-	sceneRTT.add (torus);
+	sceneRTT.add(torus);
+  sceneMono.add(torus.clone());
+  blockerMaterials.push(torusMaterial);*/
   
 	scene = new THREE.Scene();
 	rttmaterial = new THREE.ShaderMaterial( {
@@ -149,26 +207,39 @@ function init()
   cameraRTT = new THREE.OrthographicCamera(-50, 50, 50, -50, -10, 10); 
   
   // blocker
-  sceneMono = new THREE.Scene();
- /* var objArray = sceneRTT.children;
-  for(var i = 0; i < objArray.length; i++){
-  	var tmp = objArray[i].clone();
-    tmp.material.colorWrite = false;
-    sceneMono.add(tmp);
-  }*/
-  var tmp = torus.clone();
-  tmp.material = tmp.material.clone();
-  tmp.material.colorWrite = false;		// don't output to color buffer
-  sceneMono.add(tmp);
+  //console.log(backgroundObject.length);
+  /*var t = 0;
+  for(var i = 0; i < backgroundObject.length; i++){
+  	var tmp = backgroundObject[i].clone();
+    if(tmp.material !== undefined){
+    	t++
+    	tmp.material = tmp.material.clone();
+    	tmp.material.colorWrite = false;		// don't output to color buffer
+    	sceneMono.add(tmp);
+    }
+  }
+  console.log(t);*/
   
   // main object
   sceneColor = new THREE.Scene();
-  var column = new THREE.Mesh(new THREE.BoxGeometry(60, 150, 20),
+  // Danboard
+  var db = makeDanboard();
+  sceneColor.add(db);
+  
+  /*var column = new THREE.Mesh(new THREE.BoxGeometry(60, 150, 20),
     new THREE.MeshLambertMaterial({
       color: 0xff1234
     }));
   sceneColor.add(column);
+  column.castShadow = true;*/
+  
+  sceneColor.add(ambientLight.clone());
   sceneColor.add(pointLight.clone());
+  //sceneColor.add(spotLight.clone());
+  
+  // renderer shadow set
+  renderer.shadowMapEnabled = true;
+  renderer.shadowMapType = THREE.PCFShadowMap;
 }
 
 window.onresize = function () {
@@ -187,6 +258,9 @@ function animate()
 	renderer.clear();
   
   // render to the rtTexture
+  console.log(blockerMaterials.length);
+  for(var i = 0; i < blockerMaterials.length; i++)
+  	blockerMaterials[i].colorWrite = true;
  	renderer.setClearColor (0x888800);
 	renderer.render (sceneRTT, camera, rtTexture, true);
   
@@ -195,10 +269,276 @@ function animate()
   renderer.render(scene, cameraRTT);
   
   // render the blocker to screen
+  for(var i = 0; i < blockerMaterials.length; i++)
+  	blockerMaterials[i].colorWrite = false;
 	renderer.render(sceneMono, camera);
   // render the main object(colorful) to screen
   renderer.render(sceneColor, camera);
+}
 
+function arrangeTorii(){
+	var t = [];
+  for(var i = 0; i < 20; i++)
+  	t.push(makeTorii());
+	/*var t1 = makeTorii();
+  var t2 = makeTorii();
+  var t3 = makeTorii();
+  var t4 = makeTorii();
+  var t5 = makeTorii();
+  var t6 = makeTorii();
+  var t7 = makeTorii();
+  var t8 = makeTorii();
+  var t9 = makeTorii();
+  var t10 = makeTorii();
+  var t11 = makeTorii();
+  var t12 = makeTorii();
+  var t13 = makeTorii();
+  var t14 = makeTorii();
+  var t15 = makeTorii();
+  var t16 = makeTorii();
+  var t17 = makeTorii();
+  var t18 = makeTorii();
+  var t19 = makeTorii();
+  var t20 = makeTorii();*/
+  
+  t[0].position.set(20, 0, -480);
+  t[1].position.set(20, 0, -430);
+  t[2].position.set(20, 0, -380);
+  t[3].position.set(20, 0, -330);
+  t[4].position.set(20, 0, -280);
+  t[5].position.set(20, 0, -230);
+  t[6].position.set(20, 0, -180);
+  t[7].position.set(20, 0, -130);
+  t[8].position.set(20, 0, -80);
+  t[9].position.set(20, 0, -30);
+  t[10].position.set(20, 0, 20);
+  t[11].position.set(20, 0, 70);
+  t[12].position.set(20, 0, 120);
+  t[13].position.set(20, 0, 170);
+  t[14].position.set(20, 0, 220);
+  t[15].position.set(20, 0, 270);
+  t[16].position.set(20, 0, 320);
+  t[17].position.set(20, 0, 370);
+  t[18].position.set(20, 0, 420);
+  t[19].position.set(20, 0, 470);
+  
+  
+  for(var i = 0; i < 20; i++){
+  	sceneRTT.add(t[i]);
+  	sceneMono.add(t[i].clone());
+  }
+}
+
+function makeTorii(){
+	var c1 = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 100), toriiMaterial);
+ 	c1.position.y = 50;
+  var c2 = c1.clone();
+  c1.position.x = -60;
+  c2.position.x = 60;
+  var c3 = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 150), toriiMaterial);
+  c3.rotation.z = Math.PI/2;
+  c3.position.y = 80;
+  var c4 = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 180), toriiMaterial);
+  c4.rotation.z = Math.PI/2;
+  c4.position.y = 100;
+  
+  var torii = new THREE.Object3D();
+  torii.add(c1);
+  torii.add(c2);
+  torii.add(c3);
+  torii.add(c4);
+  
+  return torii;
+}
+
+function makeDanboard(){
+	head = makeHead();
+  torso = makeTorso();
+  handR = makeHand();
+  handL = handR.clone();
+  legR = makeLeg();
+  legL = legR.clone();
+  
+  body = new THREE.Object3D();
+  body.add(head);
+  body.add(torso);
+  body.add(handR);
+  body.add(handL);
+  
+  head.position.y = torsoY + ballRadius;
+  torso.position.y = torsoY/2 + ballRadius;
+  handR.position.y = torsoY;
+  handR.position.x = -(torsoX/2 + ballRadius);
+  handL.position.y = torsoY;
+  handL.position.x = torsoX/2 + ballRadius;
+  
+  danboard = new THREE.Object3D();
+  danboard.add(body);
+  danboard.add(legR);
+  danboard.add(legL);
+  
+  body.position.y = legY;
+  legR.position.y = ballRadius + legY;
+  legR.position.x = -(torsoX/2 - legX/2);
+  legL.position.y = ballRadius + legY;
+  legL.position.x = torsoX/2 - legX/2;
+  
+  // motion adjust
+  head.rotation.x = -0.5235987755982988;
+  head.rotation.y = -0.14635165524278437;
+  head.rotation.z = 0;
+  handR.rotation.x = -1.937204772298146;
+  handR.rotation.y = 0;
+  handR.rotation.z = -0.1;
+  handL.rotation.x = 0.7549563741184775;
+  handL.rotation.y = 0;
+  handL.rotation.z = 0.1;
+  legR.rotation.x = -0.15386940762825274;
+  legR.rotation.y = 0.0838840415687197;
+  legR.rotation.z = -0.1594635374170148;
+  legL.rotation.x = 0.3066318411009066;
+  legL.rotation.y = 0.028781328045572485;
+  legL.rotation.z = 0.16806675325066434;
+  lidFrame.rotation.x = -0.957187147469612;
+  lidFrame2.rotation.x = -0.6089224781228288;
+  lidFrame3.rotation.x = 0.6970251474516281;
+  lidFrame4.rotation.x = 0.5477688605887211;
+  body.rotation.x = 0;
+  body.rotation.y = 0;
+  body.rotation.z = 0;
+  danboard.rotation.x = 0.31562059909250473;
+  danboard.rotation.y = 0.1846075776242877;
+  danboard.rotation.z = 0;
+  danboard.position.x = 0;
+  danboard.position.y = 22.167838106403405;
+  danboard.position.z = 90;
+  
+  return danboard;
+}
+
+function makeHead(){
+	THREE.ImageUtils.crossOrigin = '';
+	var materials = [];
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/Oi0S4ke.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/ucFLAON.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/jX22xkH.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({visible:false}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/fA2rgLf.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/yN2Nkvp.jpg'), side:THREE.DoubleSide}));
+  
+  var box = new THREE.Mesh(new THREE.BoxGeometry(headX, headY, headZ), new THREE.MeshFaceMaterial(materials));
+  var ball = makeLinkBall(headBallRadius);
+  
+  var headFrame = new THREE.Object3D();
+  headFrame.add(box);
+  headFrame.add(ball);
+  box.position.y = headY/2 - headBallRadius/2;
+  
+  box.castShadow = true;
+  box.receiveShadow = true;
+  ball.castShadow = true;
+  ball.receiveShadow = true;
+  
+  return headFrame;
+}
+
+function makeTorso(){
+  var materials = [];
+  materials.push(new THREE.MeshPhongMaterial({color:boxColor, side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({color:boxColor, side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({color:boxColor, side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({visible:false}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/OT3on1d.jpg'), side:THREE.DoubleSide}));
+  materials.push(new THREE.MeshPhongMaterial({map:THREE.ImageUtils.loadTexture('http://i.imgur.com/1ctWiHd.jpg'), side:THREE.DoubleSide}));
+  
+  var box = new THREE.Mesh(new THREE.BoxGeometry(torsoX, torsoY, torsoZ), new THREE.MeshFaceMaterial(materials));
+  
+  var lid;
+  
+  lid = new THREE.Mesh(new THREE.PlaneGeometry(torsoX, torsoZ/2), new THREE.MeshPhongMaterial({color:boxColor, side:THREE.DoubleSide}));
+  lid2 = lid.clone();
+  lid3 = lid.clone();
+  lid4 = lid.clone();
+  lid.position.y = -torsoZ/4;
+  lidFrame = new THREE.Object3D();
+  lidFrame.add(lid);
+  lidFrame2 = lidFrame.clone();
+  lidFrame3 = lidFrame.clone();
+  lidFrame4 = lidFrame.clone();
+  
+  lidFrame.position.z = torsoZ/2;
+  lidFrame.position.y = -torsoY/2;
+  lidFrame.rotation.x = -Math.PI/4;
+  
+  lidFrame2.position.x = torsoZ/2;
+  lidFrame2.position.y = -torsoY/2;
+  lidFrame2.rotation.set(-Math.PI/4, Math.PI/2, 0, 'YXZ');
+  
+  lidFrame3.position.z = -torsoZ/2;
+  lidFrame3.position.y = -torsoY/2;
+  lidFrame3.rotation.x = Math.PI/4;
+  
+  lidFrame4.position.x = -torsoZ/2;
+  lidFrame4.position.y = -torsoY/2;
+  lidFrame4.rotation.set(Math.PI/4, Math.PI/2, 0, 'YXZ');
+  
+  var torsoFrame = new THREE.Object3D();  
+  torsoFrame.add(box);
+  torsoFrame.add(lidFrame);
+  torsoFrame.add(lidFrame2);
+  torsoFrame.add(lidFrame3);
+  torsoFrame.add(lidFrame4);
+  
+  box.castShadow = true;
+  box.receiveShadow = true;
+  lidFrame.castShadow = true;
+  lidFrame.receiveShadow = true;
+  lidFrame2.castShadow = true;
+  lidFrame2.receiveShadow = true;
+  lidFrame3.castShadow = true;
+  lidFrame3.receiveShadow = true;
+  lidFrame4.castShadow = true;
+  lidFrame4.receiveShadow = true;
+  
+  return torsoFrame;
+}
+
+function makeHand(){
+  var box = new THREE.Mesh(new THREE.BoxGeometry(handX, handY, handZ), new THREE.MeshPhongMaterial({color:boxColor, side:THREE.DoubleSide}));
+  var ball = makeLinkBall(ballRadius);
+  
+  var handFrame = new THREE.Object3D();
+  handFrame.add(ball);
+  handFrame.add(box);
+  box.position.y = -handY/2 - ballRadius;
+  
+  box.castShadow = true;
+  box.receiveShadow = true;
+  ball.castShadow = true;
+  ball.receiveShadow = true;
+  
+  return handFrame;
+}
+
+function makeLeg(){
+  var box = new THREE.Mesh(new THREE.BoxGeometry(legX, legY, legZ), new THREE.MeshPhongMaterial({color:boxColor, side:THREE.DoubleSide}));
+  var ball = makeLinkBall(ballRadius);
+  
+  var legFrame = new THREE.Object3D();
+  legFrame.add(ball);
+  legFrame.add(box);
+  box.position.y = -legY/2 - ballRadius;
+  
+  box.castShadow = true;
+  box.receiveShadow = true;
+  ball.castShadow = true;
+  ball.receiveShadow = true;
+
+	return legFrame;
+}
+
+function makeLinkBall(radius){
+	return new THREE.Mesh(new THREE.SphereGeometry(radius, 20, 20), new THREE.MeshPhongMaterial({color:boxColor, side:THREE.DoubleSide}));
 }
 
 </script>
