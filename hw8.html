@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+body {
+  background:#777;
+  padding:0;
+  margin:0;
+  font-weight: bold;
+  overflow:hidden;
+}
+
+#info {
+  position: absolute;
+  top: 0px; width: 100%;
+  color: #ffffff;
+  padding: 5px;
+  font-family:Monospace;
+  font-size:20px;
+  text-align:center;
+  z-index:1000;
+}
+</style>
+</head>
+
+<body> 
+<div id="info">
+Computer Graphics<br/>
+Homework 8<br/>
+Integrated Homework<br/>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r76/three.min.js"></script>
+<script src="https://dl.dropboxusercontent.com/u/3587259/Code/Threejs/OrbitControls.js"></script>
+
+<script>
+var container;
+var camera, scene, renderer, controls;
+var cameraCube, sceneCube;
+
+var mesh, lightMesh, geometry;
+var spheres = [], spheres_radius = [], spheres_pos_x = [], spheres_pos_y = [], spheres_pos_z = [], spheres_direction = [];
+var birds_l = [], birds_r = [], birds = [], birds_pos_x = [], birds_pos_y = [], birds_pos_z = [], birdS;
+
+var directionalLight, pointLight;
+
+var mouseX = 0;
+var mouseY = 0;
+
+var windowHalfX = window.innerWidth / 2;
+var windowHalfY = window.innerHeight / 2;
+
+document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+init();
+animate();
+
+function init() {
+	THREE.ImageUtils.crossOrigin = '';
+
+  container = document.createElement( 'div' );
+  document.body.appendChild( container );
+
+  camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 100000 );
+  camera.position.z = 3200;
+
+  cameraCube = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 100000 );
+  
+  //
+
+  renderer = new THREE.WebGLRenderer();
+  //renderer.setPixelRatio( window.devicePixelRatio );
+  renderer.setSize( window.innerWidth, window.innerHeight );
+  renderer.autoClear = false;
+  container.appendChild( renderer.domElement );
+
+  //
+
+  window.addEventListener( 'resize', onWindowResize, false );
+
+	//controls = new THREE.OrbitControls (camera, renderer.domElement);
+  
+  ////////////////////////////////////////////////////////////////////////////
+  scene = new THREE.Scene();
+  sceneCube = new THREE.Scene();
+
+  var geometry = new THREE.SphereGeometry( 100, 32, 16 );
+
+  var path = "https://mdes4214.github.io/2016CGhw/images/hw8/cubemap_sky/";
+  var format = '.png';
+  var urls = [
+    path + 'posx' + format, path + 'negx' + format,
+    path + 'posy' + format, path + 'negy' + format,
+    path + 'posz' + format, path + 'negz' + format
+  ];
+
+  var textureCube = THREE.ImageUtils.loadTextureCube( urls );
+  var material = new THREE.MeshBasicMaterial( { color: 0xffffff, envMap: textureCube } );
+
+	// ball
+  for ( var i = 0; i < 500; i ++ ) {
+
+    var mesh = new THREE.Mesh( geometry, material );
+
+    mesh.position.x = Math.random() * 10000 - 5000;
+    mesh.position.y = Math.random() * 10000 - 5000;
+    mesh.position.z = Math.random() * 10000 - 5000;
+
+		var size = Math.random() * 3 + 1;
+    mesh.scale.x = mesh.scale.y = mesh.scale.z = size;
+ 		spheres_radius.push(size);
+    spheres_pos_x.push(mesh.position.x);
+    spheres_pos_y.push(mesh.position.y);
+    spheres_pos_z.push(mesh.position.z);
+    spheres_direction.push((Math.random() - 0.5) * 2000 + 5000);
+
+    scene.add( mesh );
+
+    spheres.push( mesh );
+
+  }
+
+  // Skybox
+  var shader = THREE.ShaderLib[ "cube" ];
+  shader.uniforms[ "tCube" ].value = textureCube;
+
+  var material = new THREE.ShaderMaterial( {
+
+    fragmentShader: shader.fragmentShader,
+    vertexShader: shader.vertexShader,
+    uniforms: shader.uniforms,
+    depthWrite: false,
+    side: THREE.BackSide
+
+  } ),
+
+  mesh = new THREE.Mesh( new THREE.BoxGeometry( 100, 100, 100 ), material );
+  sceneCube.add( mesh );
+  
+  // bird
+  birdS = new THREE.Object3D();
+  for(var i = 0; i < 1000; i++){
+    var bird = makeBird(i);
+    
+    //bird.position.z = (i-25) * 200;
+    bird.position.x = (i-25) * 150;
+    if(i >= 25){
+    	bird.position.y = (25-i) * 150;
+    	bird.position.z = (i-25) * 150;
+    }
+    else{
+    	bird.position.y = (i-25) * 150;
+      bird.position.z = (25-i) * 150;
+    }
+    //scene.add(bird);
+    birdS.add(bird);
+    birds_pos_x.push(bird.position.x);
+    birds_pos_y.push(bird.position.y);
+    birds_pos_z.push(bird.position.z);
+  }
+  scene.add(birdS);
+}
+
+function makeBird(i){
+	var left = new THREE.Mesh(new THREE.PlaneGeometry( 150, 75, 2), new THREE.MeshBasicMaterial( {side: THREE.DoubleSide} ));
+  var right = left.clone();
+  var l_f = new THREE.Object3D();
+  var r_f = new THREE.Object3D();
+  var body = new THREE.Object3D();
+  left.position.x = -75;
+  right.position.x = 75;
+  left.rotation.x = Math.PI/2;
+  right.rotation.x = Math.PI/2;
+  l_f.add(left);
+  r_f.add(right);
+  l_f.rotation.z = -Math.PI/4;
+  r_f.rotation.z = Math.PI/4;
+  
+  body.add(l_f);
+  body.add(r_f);
+  
+  birds.push(body);
+  birds_l.push(l_f);
+  birds_r.push(r_f);
+  return body;
+}
+
+function onWindowResize() {
+
+  windowHalfX = window.innerWidth / 2,
+  windowHalfY = window.innerHeight / 2,
+
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+
+  cameraCube.aspect = window.innerWidth / window.innerHeight;
+  cameraCube.updateProjectionMatrix();
+
+  renderer.setSize( window.innerWidth, window.innerHeight );
+
+}
+
+function onDocumentMouseMove( event ) {
+
+  mouseX = ( event.clientX - windowHalfX ) * 10;
+  mouseY = ( event.clientY - windowHalfY ) * 10;
+
+}
+
+//
+
+function animate() {
+
+  requestAnimationFrame( animate );
+
+  render();
+
+}
+
+function render() {
+
+  var timer = 0.0001 * Date.now();
+
+  for ( var i = 0, il = spheres.length; i < il; i ++ ) {
+
+    var sphere = spheres[ i ];
+
+    //sphere.position.x = 5000 * Math.cos( timer + i );
+    //sphere.position.y = 5000 * Math.sin( timer + i * 1.1 );
+
+		//if(Math.round(timer * 1000) % i == 0)
+    //	spheres_direction[i] = (Math.random() - 0.5) * 5000;
+    
+    sphere.position.x = spheres_pos_x[i] + spheres_direction[i] * Math.cos( timer + i );
+    sphere.position.y = spheres_pos_y[i] + spheres_direction[i] * Math.sin( timer + i * 1.1 );
+    sphere.position.z = spheres_pos_z[i] + spheres_direction[i] * Math.sin( timer + i * 1.2 );
+
+  }
+  
+  for(var i = 0; i < birds.length; i++){
+  	birds_l[i].rotation.z = 100 * -Math.cos(timer + i);
+    birds_r[i].rotation.z = 100 * Math.cos(timer + i);
+    
+    birds[i].position.x = birds_pos_x[i] + 5000 * Math.cos(timer + i);
+    birds[i].position.y = birds_pos_y[i] + 5000 * Math.cos(timer + i * 1.1);
+    birds[i].position.z = birds_pos_z[i] + 5000 * Math.sin(timer + i * 1.2);
+    
+	}
+  //birdS.position.x = 5000 * Math.cos(timer);
+  //birdS.position.y = 2000 * Math.cos(timer);
+  //birdS.position.z = -5000 * Math.sin(timer);
+  
+  camera.position.x += ( mouseX - camera.position.x ) * .05;
+  camera.position.y += ( - mouseY - camera.position.y ) * .05;
+
+  camera.lookAt( scene.position );
+  cameraCube.rotation.copy( camera.rotation );
+
+  renderer.render( sceneCube, cameraCube );  // scene with small skybox only
+  renderer.render( scene, camera );  // scene with spheres only
+
+}
+</script>
+
+
+</body>
+
+</html>
